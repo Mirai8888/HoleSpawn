@@ -114,9 +114,9 @@ Examples:
     )
     parser.add_argument(
         "--provider",
-        choices=("anthropic", "openai"),
+        choices=("anthropic", "openai", "google"),
         default=None,
-        help="AI provider (default: Anthropic if ANTHROPIC_API_KEY set, else OpenAI).",
+        help="AI provider (default: Anthropic if ANTHROPIC_API_KEY set, else OpenAI, else Google).",
     )
     # Audience / following
     parser.add_argument(
@@ -147,6 +147,12 @@ Examples:
         "--no-fetch-audience",
         action="store_true",
         help="Do not fetch posts for followed accounts; use only handle list (no Bluesky/Mastodon fetch).",
+    )
+    # Engagement brief
+    parser.add_argument(
+        "--no-engagement",
+        action="store_true",
+        help="Skip generating engagement_brief.md (vulnerability map, DM ideas, orchestration).",
     )
     # Deploy
     parser.add_argument(
@@ -276,6 +282,23 @@ Examples:
     build_site(spec, sections_content, out_dir)
     _log(f"Site written to {out_dir.absolute()}")
     _log("  index.html, styles.css, app.js")
+
+    # Engagement brief: vulnerability map, DM ideas, orchestration plan
+    if not args.no_engagement:
+        try:
+            from holespawn.engagement import get_engagement_brief
+            _log("Generating engagement brief (vulnerability map, DM ideas, orchestration)...")
+            brief = get_engagement_brief(
+                content, profile,
+                audience_profile=audience_profile,
+                provider=args.provider,
+            )
+            (out_dir / "engagement_brief.md").write_text(brief.strip(), encoding="utf-8")
+            _log("  engagement_brief.md")
+        except ValueError:
+            _log("Skipping engagement brief (no API key).")
+        except Exception as e:
+            _log(f"Engagement brief failed: {e}")
 
     if args.deploy:
         _deploy(out_dir)

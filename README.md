@@ -32,6 +32,7 @@ Set an AI API key for personalized experience and website generation:
 ```bash
 set ANTHROPIC_API_KEY=your_key    # Windows
 # or: set OPENAI_API_KEY=your_key
+# or: set GOOGLE_API_KEY=your_key
 ```
 
 ---
@@ -58,7 +59,17 @@ python -m holespawn.build_site data/sample_posts.txt -o output
 ```
 
 - **Input**: Omit for interactive X scrape, or path to text/JSON file (one post per line or blank-line blocks).
-- **Output**: `-o output` writes `index.html`, `styles.css`, and `app.js`. Deploy that folder to any static host.
+- **Output**: `-o output` writes `index.html`, `styles.css`, `app.js`, and **`engagement_brief.md`** (see below). Deploy the folder to any static host.
+
+### Engagement brief (vulnerability map, DM ideas, orchestration)
+
+Each build also generates **`engagement_brief.md`** in the output folder (unless you pass `--no-engagement`). It includes:
+
+- **Vulnerability map (social-engineering lens)** — Emotional triggers, trust hooks, resistance points, and susceptibilities inferred from the profile (for designing interactions that resonate).
+- **DM / interaction ideas** — Concrete angles for opening or deepening contact (first DM, follow-ups, in-world interactions).
+- **Orchestration plan** — Phased rollout (how to introduce the rabbit hole, when to deepen, pacing, how to land).
+
+Use this for art and ARG design only; consent and ethics apply.
 
 ### Map audience (who they follow → what their audience is susceptible to)
 

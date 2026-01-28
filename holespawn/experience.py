@@ -83,6 +83,20 @@ def _call_ai(user_content: str, api_key: str, provider: str, model: str | None) 
     except ImportError:
         raise ImportError("Install anthropic and openai: pip install anthropic openai") from None
 
+    if provider == "google":
+        try:
+            from google import genai  # type: ignore
+        except ImportError:
+            raise ImportError("Install google-genai: pip install google-genai") from None
+
+        client = genai.Client(api_key=api_key)
+        resp = client.models.generate_content(
+            model=model or "gemini-1.5-flash",
+            contents=[
+                {"role": "user", "parts": [{"text": f"{EXPERIENCE_SPEC_SYSTEM}\n\n{user_content}"}]},
+            ],
+        )
+        return getattr(resp, "text", None) or ""
     if provider == "anthropic":
         client = anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
@@ -125,11 +139,22 @@ def get_experience_spec(
 ) -> ExperienceSpec:
     """Call AI to generate a personalized experience spec from profile + narrative (+ optional audience)."""
     prov = "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "openai"
-    if provider and provider.lower() in ("anthropic", "claude", "openai"):
-        prov = "anthropic" if provider.lower() in ("anthropic", "claude") else "openai"
-    api_key = os.getenv("ANTHROPIC_API_KEY") if prov == "anthropic" else os.getenv("OPENAI_API_KEY")
+    if provider and provider.lower() in ("anthropic", "claude", "openai", "google", "gemini"):
+        if provider.lower() in ("anthropic", "claude"):
+            prov = "anthropic"
+        elif provider.lower() in ("google", "gemini"):
+            prov = "google"
+        else:
+            prov = "openai"
+
+    if prov == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+    elif prov == "google":
+        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    else:
+        api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("Set ANTHROPIC_API_KEY or OPENAI_API_KEY")
+        raise ValueError("Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY")
 
     audience_summary = audience_profile.summary if audience_profile else None
     context = build_context(content, profile, audience_summary=audience_summary)

@@ -32,13 +32,13 @@ def main():
     parser.add_argument(
         "--ai",
         action="store_true",
-        help="Use AI API (Claude or OpenAI). Set ANTHROPIC_API_KEY or OPENAI_API_KEY.",
+        help="Use AI API (Claude/OpenAI/Google). Set ANTHROPIC_API_KEY or OPENAI_API_KEY or GOOGLE_API_KEY.",
     )
     parser.add_argument(
         "--provider",
-        choices=("anthropic", "openai"),
+        choices=("anthropic", "openai", "google"),
         default=None,
-        help="Force provider (default: Anthropic if ANTHROPIC_API_KEY set, else OpenAI).",
+        help="Force provider (default: Anthropic if ANTHROPIC_API_KEY set, else OpenAI, else Google).",
     )
     parser.add_argument(
         "-n", "--count",
@@ -75,9 +75,9 @@ def main():
     profile = build_profile(content)
 
     if args.ai:
-        if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OPENAI_API_KEY"):
+        if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OPENAI_API_KEY") and not os.getenv("GOOGLE_API_KEY") and not os.getenv("GEMINI_API_KEY"):
             print(
-                "AI mode requires an API key. Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment.",
+                "AI mode requires an API key. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in your environment.",
                 file=sys.stderr,
             )
             sys.exit(1)

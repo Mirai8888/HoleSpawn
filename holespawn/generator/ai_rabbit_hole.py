@@ -70,6 +70,43 @@ def _stream_openai(
             yield chunk.choices[0].delta.content
 
 
+def _stream_google(
+    context: str,
+    api_key: str,
+    model: str = "gemini-1.5-flash",
+    max_tokens: int = 512,
+) -> Iterator[str]:
+    try:
+        from google import genai  # type: ignore
+    except ImportError:
+        raise ImportError("Install google-genai: pip install google-genai") from None
+
+    client = genai.Client(api_key=api_key)
+
+    # Best-effort streaming API; if unavailable, fall back to single response.
+    try:
+        stream = client.models.generate_content_stream(
+            model=model,
+            contents=[
+                {"role": "user", "parts": [{"text": f"{SYSTEM_PROMPT}\n\n{context}"}]},
+            ],
+        )
+        for chunk in stream:
+            text = getattr(chunk, "text", None)
+            if text:
+                yield text
+    except Exception:
+        resp = client.models.generate_content(
+            model=model,
+            contents=[
+                {"role": "user", "parts": [{"text": f"{SYSTEM_PROMPT}\n\n{context}"}]},
+            ],
+        )
+        text = getattr(resp, "text", None) or ""
+        if text:
+            yield text
+
+
 class AIRabbitHoleGenerator:
     """
     Generates rabbit hole fragments by sending full narrative + profile to an AI API.
@@ -89,29 +126,48 @@ class AIRabbitHoleGenerator:
         self._context = build_context(content, profile)
 
         # Resolve provider: explicit > env (prefer Anthropic if both keys set)
-        if provider and provider.lower() in ("anthropic", "claude", "openai"):
-            self.provider = "anthropic" if provider.lower() in ("anthropic", "claude") else "openai"
+        if provider and provider.lower() in ("anthropic", "claude", "openai", "google", "gemini"):
+            if provider.lower() in ("anthropic", "claude"):
+                self.provider = "anthropic"
+            elif provider.lower() in ("google", "gemini"):
+                self.provider = "google"
+            else:
+                self.provider = "openai"
         else:
-            self.provider = "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "openai"
+            if os.getenv("ANTHROPIC_API_KEY"):
+                self.provider = "anthropic"
+            elif os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_API_KEY"):
+                self.provider = "openai"
+            else:
+                self.provider = "google"
 
-        self.api_key = (
-            os.getenv("ANTHROPIC_API_KEY")
-            if self.provider == "anthropic"
-            else os.getenv("OPENAI_API_API_KEY") or os.getenv("OPENAI_API_KEY")
-        )
+        if self.provider == "anthropic":
+            self.api_key = os.getenv("ANTHROPIC_API_KEY")
+        elif self.provider == "google":
+            self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        else:
+            self.api_key = os.getenv("OPENAI_API_API_KEY") or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "No API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment."
+                "No API key found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY."
             )
 
         self.model = model or (
-            "claude-3-5-haiku-20241022" if self.provider == "anthropic" else "gpt-4o-mini"
+            "claude-3-5-haiku-20241022"
+            if self.provider == "anthropic"
+            else "gemini-1.5-flash"
+            if self.provider == "google"
+            else "gpt-4o-mini"
         )
         self.max_tokens = 512
 
     def _stream_one_fragment(self) -> Iterator[str]:
         if self.provider == "anthropic":
             yield from _stream_claude(
+                self._context, self.api_key, model=self.model, max_tokens=self.max_tokens
+            )
+        elif self.provider == "google":
+            yield from _stream_google(
                 self._context, self.api_key, model=self.model, max_tokens=self.max_tokens
             )
         else:
