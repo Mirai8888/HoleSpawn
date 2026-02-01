@@ -86,15 +86,15 @@ def _log(msg: str) -> None:
 
 
 def _create_output_dir(username: str, base_dir: str = "outputs", use_site_subdir: bool = True) -> Path:
-    """Create timestamped output directory: outputs/YYYY-MM-DD_HHMMSS_username."""
+    """Create timestamped output directory: outputs/YYYYMMDD_HHMMSS_username."""
     safe = re.sub(r"[^\w\-]", "_", username.strip().lstrip("@")) or "user"
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base = Path(base_dir)
     base.mkdir(parents=True, exist_ok=True)
     output_dir = base / f"{timestamp}_{safe}"
     output_dir.mkdir(parents=True, exist_ok=True)
     if use_site_subdir:
-        (output_dir / "site").mkdir(exist_ok=True)
+        (output_dir / "trap_architecture").mkdir(exist_ok=True)
     # Record latest run (file instead of symlink for Windows)
     latest_file = base / "latest.txt"
     latest_file.write_text(output_dir.name, encoding="utf-8")
@@ -215,7 +215,7 @@ Examples:
     parser.add_argument(
         "-o", "--output",
         default=None,
-        help="Output directory. If omitted, uses outputs/YYYY-MM-DD_HHMMSS_username/.",
+        help="Output directory. If omitted, uses outputs/YYYYMMDD_HHMMSS_username/.",
     )
     parser.add_argument(
         "--config",
@@ -231,7 +231,7 @@ Examples:
     parser.add_argument(
         "--no-engagement",
         action="store_true",
-        help="Skip generating engagement_brief.md.",
+        help="Skip generating binding_protocol.md.",
     )
     parser.add_argument(
         "--no-cache",
@@ -329,12 +329,13 @@ def main() -> None:
     if args.output:
         out_dir = Path(args.output)
         out_dir.mkdir(parents=True, exist_ok=True)
-        site_dir = out_dir
+        site_dir = out_dir / "trap_architecture"
+        site_dir.mkdir(exist_ok=True)
         use_organized = False
     else:
         base_dir = config.get("output", {}).get("base_dir", "outputs")
         out_dir = _create_output_dir(username, base_dir=base_dir, use_site_subdir=True)
-        site_dir = out_dir / "site"
+        site_dir = out_dir / "trap_architecture"
         use_organized = True
         if not args.quiet:
             _setup_logging(verbose=args.verbose, quiet=False, log_dir=out_dir)
@@ -431,15 +432,15 @@ def main() -> None:
         "data_source": "twitter_archive" if args.twitter_archive else ("apify" if args.twitter_username else "file"),
     }
     (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-    (out_dir / "profile.json").write_text(
+    (out_dir / "behavioral_matrix.json").write_text(
         json.dumps(_profile_to_dict(profile), indent=2), encoding="utf-8"
     )
 
-    # Engagement brief
+    # Binding protocol (engagement brief)
     if not args.no_engagement:
         try:
             from holespawn.engagement import get_engagement_brief
-            _log("Generating engagement brief...")
+            _log("Generating binding protocol...")
             brief = get_engagement_brief(
                 content,
                 profile,
@@ -447,9 +448,9 @@ def main() -> None:
                 tracker=tracker,
                 calls_per_minute=rate,
             )
-            brief_path = out_dir / "engagement_brief.md"
+            brief_path = out_dir / "binding_protocol.md"
             brief_path.write_text(brief.strip(), encoding="utf-8")
-            _log("  engagement_brief.md")
+            _log("  binding_protocol.md")
         except ValueError:
             _log("Skipping engagement brief (no API key).")
         except Exception as e:
