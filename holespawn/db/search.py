@@ -4,8 +4,11 @@ Returns ranked list of matching profiles for research/product understanding — 
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Optional
+
+log = logging.getLogger(__name__)
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.llm import call_llm
@@ -102,7 +105,8 @@ def search_by_agenda(
             tracker=tracker,
             calls_per_minute=calls_per_minute,
         )
-    except Exception:
+    except Exception as e:
+        log.warning("Agenda search LLM call failed: %s", e)
         return []
 
     # Parse JSON (strip markdown if present)

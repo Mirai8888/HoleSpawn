@@ -120,9 +120,10 @@ def load_edges_file(
         else:
             ti = 1 if len(header) > 1 else 0
     for line in lines[1:]:
-        parts = [p.strip() for p in re.split(r",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", line) if p.strip()]
+        # Keep all parts so column indices match header (do not filter empty cells)
+        parts = [p.strip().strip('"') for p in re.split(r",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", line)]
         if len(parts) > max(si, ti):
-            edges.append((parts[si].strip('"'), parts[ti].strip('"')))
+            edges.append((parts[si], parts[ti]))
     return edges
 
 

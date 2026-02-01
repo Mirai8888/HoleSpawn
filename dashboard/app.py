@@ -61,13 +61,13 @@ def index():
 def list_profiles():
     try:
         conn = _get_db()
-        rows = conn.execute(
-            """SELECT run_id, source_username, created_at, data_source, output_dir,
-                      (engagement_brief IS NOT NULL AND trim(engagement_brief) != '') AS has_brief
-               FROM profiles ORDER BY created_at DESC"""
-        ).fetchall()
-        conn.close()
-        return jsonify([
+        try:
+            rows = conn.execute(
+                """SELECT run_id, source_username, created_at, data_source, output_dir,
+                          (engagement_brief IS NOT NULL AND trim(engagement_brief) != '') AS has_brief
+                   FROM profiles ORDER BY created_at DESC"""
+            ).fetchall()
+            return jsonify([
             {
                 "run_id": r[0],
                 "source_username": r[1],
@@ -78,6 +78,8 @@ def list_profiles():
             }
             for r in rows
         ])
+        finally:
+            conn.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -87,25 +89,28 @@ def repair_profile_brief(run_id: str):
     """Regenerate engagement brief from stored behavioral matrix (no raw content). Requires LLM API key."""
     try:
         conn = _get_db()
-        row = conn.execute(
-            "SELECT behavioral_matrix FROM profiles WHERE run_id = ?", (run_id,)
-        ).fetchone()
-        if not row or not row[0]:
+        try:
+            row = conn.execute(
+                "SELECT behavioral_matrix FROM profiles WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            if not row or not row[0]:
+                return jsonify({"error": "Profile not found"}), 404
+            matrix_text = row[0]
+        finally:
             conn.close()
-            return jsonify({"error": "Profile not found"}), 404
-        matrix_text = row[0]
-        conn.close()
         profile_dict = json.loads(matrix_text)
         from holespawn.engagement import get_engagement_brief_from_profile
         brief = get_engagement_brief_from_profile(profile_dict)
         conn = _get_db()
-        conn.execute(
-            "UPDATE profiles SET engagement_brief = ? WHERE run_id = ?",
-            (brief.strip(), run_id),
-        )
-        conn.commit()
-        conn.close()
-        return jsonify({"ok": True, "brief": brief.strip()})
+        try:
+            conn.execute(
+                "UPDATE profiles SET engagement_brief = ? WHERE run_id = ?",
+                (brief.strip(), run_id),
+            )
+            conn.commit()
+            return jsonify({"ok": True, "brief": brief.strip()})
+        finally:
+            conn.close()
     except json.JSONDecodeError as e:
         return jsonify({"error": f"Invalid profile data: {e}"}), 400
     except Exception as e:
@@ -116,13 +121,15 @@ def repair_profile_brief(run_id: str):
 def get_profile_brief(run_id: str):
     try:
         conn = _get_db()
-        row = conn.execute(
-            "SELECT engagement_brief FROM profiles WHERE run_id = ?", (run_id,)
-        ).fetchone()
-        conn.close()
-        if not row or not row[0]:
-            return jsonify({"brief": None}), 404
-        return jsonify({"brief": row[0]})
+        try:
+            row = conn.execute(
+                "SELECT engagement_brief FROM profiles WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            if not row or not row[0]:
+                return jsonify({"brief": None}), 404
+            return jsonify({"brief": row[0]})
+        finally:
+            conn.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -146,15 +153,17 @@ def search():
 def list_network_reports():
     try:
         conn = _get_db()
-        rows = conn.execute(
-            """SELECT run_id, created_at, source, output_dir
-               FROM network_reports ORDER BY created_at DESC"""
-        ).fetchall()
-        conn.close()
-        return jsonify([
-            {"run_id": r[0], "created_at": r[1], "source": r[2], "output_dir": r[3]}
-            for r in rows
-        ])
+        try:
+            rows = conn.execute(
+                """SELECT run_id, created_at, source, output_dir
+                   FROM network_reports ORDER BY created_at DESC"""
+            ).fetchall()
+            return jsonify([
+                {"run_id": r[0], "created_at": r[1], "source": r[2], "output_dir": r[3]}
+                for r in rows
+            ])
+        finally:
+            conn.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -163,13 +172,15 @@ def list_network_reports():
 def get_network_brief(run_id: str):
     try:
         conn = _get_db()
-        row = conn.execute(
-            "SELECT brief_text FROM network_reports WHERE run_id = ?", (run_id,)
-        ).fetchone()
-        conn.close()
-        if not row or not row[0]:
-            return jsonify({"brief": None}), 404
-        return jsonify({"brief": row[0]})
+        try:
+            row = conn.execute(
+                "SELECT brief_text FROM network_reports WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            if not row or not row[0]:
+                return jsonify({"brief": None}), 404
+            return jsonify({"brief": row[0]})
+        finally:
+            conn.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
