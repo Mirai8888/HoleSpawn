@@ -63,6 +63,12 @@ def main() -> None:
         action="store_true",
         help="Skip generating network_engagement_brief.md (requires API key when -o is set).",
     )
+    parser.add_argument(
+        "--db",
+        type=Path,
+        default=None,
+        help="Store network report in SQLite (path or dir; e.g. outputs/holespawn.sqlite).",
+    )
     args = parser.parse_args()
 
     if args.apify:
@@ -97,16 +103,35 @@ def main() -> None:
     report["stats"]["source"] = "apify" if args.apify else "file"
 
     out = json.dumps(report, indent=2)
+    brief_text = None
     if args.output:
         Path(args.output).write_text(out, encoding="utf-8")
         if not args.no_brief:
             try:
-                brief = get_network_engagement_brief(report)
+                brief_text = get_network_engagement_brief(report)
                 brief_path = Path(args.output).parent / "network_engagement_brief.md"
-                brief_path.write_text(brief, encoding="utf-8")
+                brief_path.write_text(brief_text, encoding="utf-8")
                 sys.stderr.write(f"  network_engagement_brief.md\n")
             except Exception as e:
                 sys.stderr.write(f"  (skipped brief: {e})\n")
+        if args.db:
+            try:
+                from holespawn.db import store_network_report, init_db
+                from datetime import datetime
+                db_path = Path(args.db)
+                init_db(db_path)
+                run_id = f"network_{Path(args.output).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                store_network_report(
+                    run_id=run_id,
+                    output_dir=Path(args.output).parent,
+                    report_json=out,
+                    brief_text=brief_text,
+                    db_path=db_path,
+                    source=report.get("stats", {}).get("source", "file"),
+                )
+                sys.stderr.write(f"  stored in DB: {run_id}\n")
+            except Exception as e:
+                sys.stderr.write(f"  (DB store skipped: {e})\n")
     else:
         print(out)
 

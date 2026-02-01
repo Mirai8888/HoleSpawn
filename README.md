@@ -85,6 +85,27 @@ Report: JSON with `clusters`, `central_accounts`, `influence_graph` (if edges pr
 
 ---
 
+## PROFILE DB & AGENDA SEARCH
+
+After a run (or network run), profiles can be stored in a SQLite DB and queried by **agenda** — a descriptive query for research or product understanding (e.g. "interested in X", "susceptible to framing Y"). Returns a **ranked list** of matching profiles, not a single "best" target.
+
+- **Storage:** Use `--db path` with `build_site.py` or `python -m holespawn.network ... -o report.json --db path` to write to SQLite (default path: `outputs/holespawn.sqlite`). Or manually: `python -m holespawn.db store path/to/run_dir --db path`.
+- **Search:** `python -m holespawn.db search --agenda "descriptive query" [--db path] [--limit N]` — uses the LLM to rank stored profiles by relevance to the agenda. Output: JSON array of `{run_id, output_dir, source_username, rank, reason}`.
+
+**CLI:**
+```bash
+# Init DB (optional; store will create if missing)
+python -m holespawn.db init --db outputs/holespawn.sqlite
+
+# Store a run dir (or use --db when building)
+python -m holespawn.db store outputs/20260201_120000_username --db outputs/holespawn.sqlite
+
+# Search by agenda (requires LLM API key)
+python -m holespawn.db search --agenda "interested in AI safety and rationalism" --limit 10
+```
+
+---
+
 ## APPROVED USAGE
 
 - Self-analysis

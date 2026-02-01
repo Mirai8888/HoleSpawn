@@ -263,6 +263,12 @@ Examples:
         action="store_true",
         help="Use legacy single-page template (default is dynamic multi-page by profile).",
     )
+    parser.add_argument(
+        "--db",
+        metavar="PATH",
+        default=None,
+        help="After run: store profile in SQLite (path or dir; default outputs/holespawn.sqlite).",
+    )
     return parser
 
 
@@ -455,6 +461,18 @@ def main() -> None:
             _log("Skipping engagement brief (no API key).")
         except Exception as e:
             _log(f"Engagement brief failed: {e}")
+
+    # Store in DB if requested
+    if getattr(args, "db", None):
+        try:
+            from holespawn.db import store_profile, init_db
+            db_path = Path(args.db)
+            init_db(db_path)
+            run_id = store_profile(out_dir, db_path)
+            if run_id and not args.quiet:
+                _log(f"  stored in DB: {run_id}")
+        except Exception as e:
+            _log(f"  DB store skipped: {e}")
 
     # Cost summary
     tracker.save_to_file(out_dir)
