@@ -1,12 +1,12 @@
 """
 Optional Twitter ingestion via Apify (actor u6ppkMWAx2E2MpEuF).
-Requires APIFY_API_TOKEN. Fails gracefully if no token or actor error.
+Requires APIFY_API_TOKEN. Returns None if no token; raises ApifyError on API failure.
 """
 
 import os
-import re
 from pathlib import Path
 
+from holespawn.errors import ApifyError
 from .loader import SocialContent
 
 APIFY_TWITTER_ACTOR = "u6ppkMWAx2E2MpEuF"
@@ -40,8 +40,8 @@ def fetch_twitter_apify(username: str, max_tweets: int = 500) -> SocialContent |
             run_input={"handles": [username], "maxTweets": max_tweets},
         )
         items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-    except Exception:
-        return None
+    except Exception as e:
+        raise ApifyError(f"Twitter fetch failed for @{username}: {e}") from e
 
     posts = []
     for item in items:

@@ -39,7 +39,8 @@ except ImportError:
 
 from holespawn.cache import ProfileCache
 from holespawn.config import load_config
-from holespawn.cost_tracker import CostTracker
+from holespawn.cost_tracker import CostExceededError, CostTracker
+from holespawn.errors import ApifyError
 from holespawn.ingest import (
     load_from_file,
     load_from_text,
@@ -294,12 +295,16 @@ def main() -> None:
         username = Path(args.twitter_archive).stem.replace(" ", "_")[:50]
     elif args.twitter_username:
         _log("Fetching tweets via Apify...")
-        content = fetch_twitter_apify(args.twitter_username)
+        try:
+            content = fetch_twitter_apify(args.twitter_username)
+        except ApifyError as e:
+            _log(f"Apify failed: {e}")
+            sys.exit(1)
         if content is None:
             if not os.getenv("APIFY_API_TOKEN") and not os.getenv("APIFY_TOKEN"):
                 _log("Apify requires APIFY_API_TOKEN. Set it in .env or use --twitter-archive.")
             else:
-                _log("Apify fetch failed or returned no tweets. Try --twitter-archive or check token.")
+                _log("Apify fetch returned no tweets. Try --twitter-archive or check token.")
             sys.exit(1)
         posts_list = list(content.iter_posts())
         _log(f"Fetched {len(posts_list)} tweets.")
@@ -362,12 +367,20 @@ def main() -> None:
             profile = build_profile(content)
             cache.set(posts_list, profile)
 
-    # Cost tracker
+    # Cost tracker (env overrides config: COST_WARN_THRESHOLD, COST_MAX_THRESHOLD)
     cfg_llm = config.get("llm", {})
     cfg_costs = config.get("costs", {})
     model = cfg_llm.get("model", "gemini-2.5-flash")
-    warn = float(cfg_costs.get("warn_threshold", 1.0))
-    max_cost = float(cfg_costs.get("max_cost", 5.0))
+    def _cost_env(name: str, default: float) -> float:
+        v = os.getenv(name)
+        if v is not None and v.strip():
+            try:
+                return float(v.strip())
+            except ValueError:
+                pass
+        return default
+    warn = _cost_env("COST_WARN_THRESHOLD", float(cfg_costs.get("warn_threshold", 1.0)))
+    max_cost = _cost_env("COST_MAX_THRESHOLD", float(cfg_costs.get("max_cost", 5.0)))
     rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))
     tracker = CostTracker(model=model, warn_threshold=warn, max_cost=max_cost)
 
@@ -474,10 +487,13 @@ def main() -> None:
         except Exception as e:
             _log(f"  DB store skipped: {e}")
 
-    # Cost summary
+    # Cost summary and hard cap
     tracker.save_to_file(out_dir)
     if not args.quiet:
         tracker.print_summary()
+    if tracker.get_cost() > tracker.max_cost:
+        _log(f"Cost ${tracker.get_cost():.2f} exceeded max ${tracker.max_cost:.2f}. Set COST_MAX_THRESHOLD to increase.")
+        sys.exit(1)
 
     if args.deploy:
         _deploy(site_dir)

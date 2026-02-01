@@ -25,6 +25,10 @@ pip install -r requirements.txt
 echo "ANTHROPIC_API_KEY=credentials" > .env
 ```
 
+**Cost:** Set `COST_WARN_THRESHOLD` (default 1.00) and `COST_MAX_THRESHOLD` (default 5.00) in `.env`. A run exits with error when estimated LLM cost exceeds max. Network runs with `--apify` and `--max-following > 20` prompt for confirmation unless `--yes`. Network brief cost is logged and saved to `cost_breakdown.json` next to the report.
+
+**Errors:** API failures surface clearly: Apify errors as `ApifyError`, LLM errors as `LLM call failed (provider=... model=...): ...`. CLI errors are prefixed with `[holespawn]` on stderr.
+
 ---
 
 ## EXECUTION

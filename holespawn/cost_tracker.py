@@ -1,11 +1,22 @@
 """
 Track LLM token usage and estimated cost.
+Reads COST_WARN_THRESHOLD and COST_MAX_THRESHOLD from env if not passed.
 """
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+
+class CostExceededError(Exception):
+    """Raised when estimated cost exceeds max_cost and abort_on_max is True."""
+    def __init__(self, current: float, max_cost: float):
+        self.current = current
+        self.max_cost = max_cost
+        super().__init__(f"Cost ${current:.2f} exceeded max ${max_cost:.2f}")
+
 
 # Per 1M tokens (input, output)
 PRICING: dict[str, tuple[float, float]] = {
@@ -30,19 +41,31 @@ def _normalize_model(name: str) -> str:
     return "gemini-2.5-flash"  # fallback
 
 
+def _float_env(name: str, default: float) -> float:
+    try:
+        v = os.getenv(name)
+        if v is not None and v.strip():
+            return float(v.strip())
+    except ValueError:
+        pass
+    return default
+
+
 class CostTracker:
-    """Track LLM token usage and costs."""
+    """Track LLM token usage and costs. Uses COST_WARN_THRESHOLD / COST_MAX_THRESHOLD from env if not passed."""
 
     def __init__(
         self,
         model: str = "gemini-flash",
-        warn_threshold: float = 1.00,
-        max_cost: float = 5.00,
+        warn_threshold: float | None = None,
+        max_cost: float | None = None,
+        abort_on_max: bool = False,
     ):
         self.model = model
         self._pricing_key = _normalize_model(model)
-        self.warn_threshold = warn_threshold
-        self.max_cost = max_cost
+        self.warn_threshold = warn_threshold if warn_threshold is not None else _float_env("COST_WARN_THRESHOLD", 1.00)
+        self.max_cost = max_cost if max_cost is not None else _float_env("COST_MAX_THRESHOLD", 5.00)
+        self.abort_on_max = abort_on_max
         self.input_tokens = 0
         self.output_tokens = 0
         self.calls: list[dict[str, Any]] = []
@@ -82,6 +105,8 @@ class CostTracker:
                 )
             except ImportError:
                 pass
+            if self.abort_on_max:
+                raise CostExceededError(cost, self.max_cost)
 
     def get_cost(self) -> float:
         prices = PRICING.get(self._pricing_key, PRICING["gemini-2.5-flash"])

@@ -8,6 +8,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -69,29 +70,52 @@ def main() -> None:
         default=None,
         help="Store network report in SQLite (path or dir; e.g. outputs/holespawn.sqlite).",
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation for large --apify runs (--max-following > 20).",
+    )
     args = parser.parse_args()
 
     if args.apify:
         username = (args.apify or "").strip().lstrip("@")
         if not username:
-            sys.stderr.write("error: --apify requires a username\n")
+            sys.stderr.write("[holespawn] error: --apify requires a username\n")
             sys.exit(1)
-        profiles = fetch_profiles_via_apify(
-            username,
-            max_following=args.max_following,
-            max_tweets_per_user=300,
-        )
+        n = args.max_following
+        if n > 20 and not args.yes:
+            sys.stderr.write(
+                f"[holespawn] Large Apify run: --max-following={n}. Apify will run ~{n} tweet scrapes + 1 following list (billed separately). "
+                "LLM cost for network brief only is typically $0.01–0.10. Continue? [y/N] "
+            )
+            try:
+                line = sys.stdin.readline().strip().lower()
+                if line not in ("y", "yes"):
+                    sys.stderr.write("[holespawn] Aborted.\n")
+                    sys.exit(0)
+            except (KeyboardInterrupt, EOFError):
+                sys.stderr.write("\n[holespawn] Aborted.\n")
+                sys.exit(0)
+        try:
+            profiles = fetch_profiles_via_apify(
+                username,
+                max_following=args.max_following,
+                max_tweets_per_user=300,
+            )
+        except Exception as e:
+            sys.stderr.write(f"[holespawn] error: Apify failed: {e}\n")
+            sys.exit(1)
         if not profiles:
-            sys.stderr.write("error: no profiles from Apify (check APIFY_API_TOKEN and --apify username)\n")
+            sys.stderr.write("[holespawn] error: no profiles from Apify (check APIFY_API_TOKEN and --apify username)\n")
             sys.exit(1)
     elif args.profiles_dir and Path(args.profiles_dir).is_dir():
         profiles_dir = Path(args.profiles_dir)
         profiles = load_profiles_from_dir(profiles_dir)
         if not profiles:
-            sys.stderr.write("error: no behavioral_matrix.json or profile.json found under dir\n")
+            sys.stderr.write("[holespawn] error: no behavioral_matrix.json or profile.json found under dir\n")
             sys.exit(1)
     else:
-        sys.stderr.write("error: provide profiles_dir or --apify USERNAME\n")
+        sys.stderr.write("[holespawn] error: provide profiles_dir or --apify USERNAME\n")
         sys.exit(1)
 
     edges = None
@@ -108,12 +132,20 @@ def main() -> None:
         Path(args.output).write_text(out, encoding="utf-8")
         if not args.no_brief:
             try:
-                brief_text = get_network_engagement_brief(report)
+                from holespawn.cost_tracker import CostTracker
+                tracker = CostTracker(
+                    warn_threshold=float(os.getenv("COST_WARN_THRESHOLD", "1")),
+                    max_cost=float(os.getenv("COST_MAX_THRESHOLD", "5")),
+                )
+                brief_text = get_network_engagement_brief(report, tracker=tracker)
                 brief_path = Path(args.output).parent / "network_engagement_brief.md"
                 brief_path.write_text(brief_text, encoding="utf-8")
                 sys.stderr.write(f"  network_engagement_brief.md\n")
+                tracker.save_to_file(Path(args.output).parent)
+                cost = tracker.get_cost()
+                sys.stderr.write(f"  Network brief cost: ${cost:.4f} ({tracker.input_tokens:,} in / {tracker.output_tokens:,} out tokens)\n")
             except Exception as e:
-                sys.stderr.write(f"  (skipped brief: {e})\n")
+                sys.stderr.write(f"[holespawn] error: network brief failed: {e}\n")
         if args.db:
             try:
                 from holespawn.db import store_network_report, init_db

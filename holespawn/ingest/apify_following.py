@@ -1,10 +1,12 @@
 """
 Optional: fetch a Twitter user's following list via Apify (paid API).
-Requires APIFY_API_TOKEN. Use only with API access you are authorized to use.
+Requires APIFY_API_TOKEN. Returns [] if no token; raises ApifyError on API failure.
 """
 
 import os
 from typing import Optional
+
+from holespawn.errors import ApifyError
 
 # Default: Twitter Following Scraper (Apify Store). Override with APIFY_FOLLOWING_ACTOR.
 APIFY_FOLLOWING_ACTOR_DEFAULT = "powerai/twitter-following-scraper"
@@ -37,8 +39,8 @@ def fetch_following_apify(
         run_input = {"screenname": username, "maxResults": min(max_results, 1000)}
         run = client.actor(actor).call(run_input=run_input)
         items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-    except Exception:
-        return []
+    except Exception as e:
+        raise ApifyError(f"Following list failed for @{username}: {e}") from e
 
     handles = []
     for item in items:
