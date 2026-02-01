@@ -6,6 +6,7 @@ Run: python -m dashboard.app (or flask --app dashboard.app run)
 import json
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 # Project root (parent of dashboard/)
@@ -43,13 +44,16 @@ def _db_path() -> Path:
 app = Flask(__name__, static_folder="static")
 
 
-def _get_db():
+@contextmanager
+def _db():
+    """Context manager for DB connections. Uses sqlite3 built-in context manager."""
     path = _db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.is_file():
         from holespawn.db import init_db
         init_db(path)
-    return sqlite3.connect(str(path))
+    with sqlite3.connect(str(path)) as conn:
+        yield conn
 
 
 @app.route("/")
@@ -60,26 +64,23 @@ def index():
 @app.route("/api/profiles")
 def list_profiles():
     try:
-        conn = _get_db()
-        try:
+        with _db() as conn:
             rows = conn.execute(
                 """SELECT run_id, source_username, created_at, data_source, output_dir,
                           (engagement_brief IS NOT NULL AND trim(engagement_brief) != '') AS has_brief
                    FROM profiles ORDER BY created_at DESC"""
             ).fetchall()
             return jsonify([
-            {
-                "run_id": r[0],
-                "source_username": r[1],
-                "created_at": r[2],
-                "data_source": r[3],
-                "output_dir": r[4],
-                "has_brief": bool(r[5]),
-            }
-            for r in rows
-        ])
-        finally:
-            conn.close()
+                {
+                    "run_id": r[0],
+                    "source_username": r[1],
+                    "created_at": r[2],
+                    "data_source": r[3],
+                    "output_dir": r[4],
+                    "has_brief": bool(r[5]),
+                }
+                for r in rows
+            ])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -88,29 +89,23 @@ def list_profiles():
 def repair_profile_brief(run_id: str):
     """Regenerate engagement brief from stored behavioral matrix (no raw content). Requires LLM API key."""
     try:
-        conn = _get_db()
-        try:
+        with _db() as conn:
             row = conn.execute(
                 "SELECT behavioral_matrix FROM profiles WHERE run_id = ?", (run_id,)
             ).fetchone()
             if not row or not row[0]:
                 return jsonify({"error": "Profile not found"}), 404
             matrix_text = row[0]
-        finally:
-            conn.close()
         profile_dict = json.loads(matrix_text)
         from holespawn.engagement import get_engagement_brief_from_profile
         brief = get_engagement_brief_from_profile(profile_dict)
-        conn = _get_db()
-        try:
+        with _db() as conn:
             conn.execute(
                 "UPDATE profiles SET engagement_brief = ? WHERE run_id = ?",
                 (brief.strip(), run_id),
             )
             conn.commit()
-            return jsonify({"ok": True, "brief": brief.strip()})
-        finally:
-            conn.close()
+        return jsonify({"ok": True, "brief": brief.strip()})
     except json.JSONDecodeError as e:
         return jsonify({"error": f"Invalid profile data: {e}"}), 400
     except Exception as e:
@@ -120,16 +115,13 @@ def repair_profile_brief(run_id: str):
 @app.route("/api/profiles/<run_id>/brief")
 def get_profile_brief(run_id: str):
     try:
-        conn = _get_db()
-        try:
+        with _db() as conn:
             row = conn.execute(
                 "SELECT engagement_brief FROM profiles WHERE run_id = ?", (run_id,)
             ).fetchone()
             if not row or not row[0]:
                 return jsonify({"brief": None}), 404
             return jsonify({"brief": row[0]})
-        finally:
-            conn.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -152,8 +144,7 @@ def search():
 @app.route("/api/network_reports")
 def list_network_reports():
     try:
-        conn = _get_db()
-        try:
+        with _db() as conn:
             rows = conn.execute(
                 """SELECT run_id, created_at, source, output_dir
                    FROM network_reports ORDER BY created_at DESC"""
@@ -162,8 +153,6 @@ def list_network_reports():
                 {"run_id": r[0], "created_at": r[1], "source": r[2], "output_dir": r[3]}
                 for r in rows
             ])
-        finally:
-            conn.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -171,16 +160,13 @@ def list_network_reports():
 @app.route("/api/network_reports/<run_id>/brief")
 def get_network_brief(run_id: str):
     try:
-        conn = _get_db()
-        try:
+        with _db() as conn:
             row = conn.execute(
                 "SELECT brief_text FROM network_reports WHERE run_id = ?", (run_id,)
             ).fetchone()
             if not row or not row[0]:
                 return jsonify({"brief": None}), 404
             return jsonify({"brief": row[0]})
-        finally:
-            conn.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

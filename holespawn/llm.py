@@ -166,10 +166,14 @@ def call_llm(
     def _do():
         return _call_llm_once(prov, system, user_content, api_key, model, max_tokens)
 
-    try:
+    exc_types = _llm_api_exception_types()
+    if exc_types:
+        try:
+            text, inp, out = _do()
+        except exc_types as e:
+            raise RuntimeError(f"LLM call failed (provider={prov} model={model}): {e}") from e
+    else:
         text, inp, out = _do()
-    except Exception as e:
-        raise RuntimeError(f"LLM call failed (provider={prov} model={model}): {e}") from e
     if tracker:
         tracker.add_usage(inp, out, operation=operation or "llm_call")
     return text

@@ -1,0 +1,20 @@
+# LLM pricing (USD per 1M tokens). Copy to pricing.yaml to override defaults.
+# Last updated: 2025-02-01 — update PRICING_LAST_UPDATED in cost_tracker.py when you change this.
+
+claude-3-5-sonnet-20241022:
+  input: 3.0
+  output: 15.0
+
+gpt-4o:
+  input: 2.5
+  output: 10.0
+
+gpt-4o-mini:
+  input: 0.15
+  output: 0.60
+
+gemini-2.5-flash:
+  input: 0.15
+  output: 0.60
+
+# Add or override models here.

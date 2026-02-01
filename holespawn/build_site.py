@@ -373,12 +373,20 @@ def main() -> None:
     model = cfg_llm.get("model", "gemini-2.5-flash")
     def _cost_env(name: str, default: float) -> float:
         v = os.getenv(name)
-        if v is not None and v.strip():
+        if v is None or not v.strip():
+            return default
+        try:
+            return float(v.strip())
+        except ValueError:
             try:
-                return float(v.strip())
-            except ValueError:
+                from loguru import logger
+                logger.warning(
+                    "Invalid {} value '{}' - must be a number. Using default: {}",
+                    name, v, default,
+                )
+            except ImportError:
                 pass
-        return default
+            return default
     warn = _cost_env("COST_WARN_THRESHOLD", float(cfg_costs.get("warn_threshold", 1.0)))
     max_cost = _cost_env("COST_MAX_THRESHOLD", float(cfg_costs.get("max_cost", 5.0)))
     rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))

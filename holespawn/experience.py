@@ -8,6 +8,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+try:
+    from jsonschema import ValidationError as JsonSchemaValidationError
+    from jsonschema import validate
+except ImportError:
+    validate = None
+    JsonSchemaValidationError = Exception
+
 from holespawn.context import build_context
 from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
@@ -78,15 +85,83 @@ Output valid JSON only, no markdown or explanation. Use this exact structure (al
 
 Allowed: aesthetic (light_airy, dark_dense, minimal, maximal, organic, technical, dreamy, gritty). experience_type (puzzles, narrative, exploration, mixed). tone (playful, melancholic, hopeful, uncanny, mysterious, serene, tense). puzzle_difficulty (gentle, medium, challenging). Section types: narrative, puzzle, ambient. Use 3–6 sections. Include at least one puzzle section if experience_type is puzzles or mixed."""
 
+EXPERIENCE_SPEC_SCHEMA = {
+    "type": "object",
+    "required": ["title", "aesthetic", "experience_type", "tone", "sections"],
+    "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "aesthetic": {"type": "string"},
+        "experience_type": {
+            "type": "string",
+            "enum": ["puzzles", "narrative", "exploration", "mixed"],
+        },
+        "tone": {"type": "string"},
+        "sections": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "title": {"type": "string"},
+                    "type": {"type": "string"},
+                },
+            },
+        },
+    },
+}
 
-def _extract_json(text: str) -> dict:
-    text = text.strip()
-    # Remove markdown code block if present
-    if "```" in text:
-        m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
-        if m:
-            text = m.group(1).strip()
-    return json.loads(text)
+
+def _extract_json(raw: str) -> dict:
+    """Extract JSON from LLM response with helpful error messages."""
+    try:
+        text = raw.strip()
+        if "```" in text:
+            m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            if m:
+                text = m.group(1).strip()
+        match = re.search(r"\{[\s\S]*\}", text) if not text.strip().startswith("{") else None
+        if match:
+            text = match.group(0)
+        if not text.strip().startswith("{"):
+            try:
+                from loguru import logger
+                logger.error("No JSON found in LLM response: {}", raw[:500])
+            except ImportError:
+                pass
+            raise ValueError(
+                f"No JSON object found in LLM response. Got: {raw[:500]}..."
+            )
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        try:
+            from loguru import logger
+            logger.error("Failed to parse JSON from LLM response: {}", raw[:1000])
+        except ImportError:
+            pass
+        raise ValueError(
+            f"LLM returned invalid JSON for experience spec. "
+            f"Parse error: {e.msg} at position {e.pos}. "
+            f"Response preview: {raw[:200]}..."
+        ) from e
+
+
+def _validate_experience_spec(data: dict) -> None:
+    """Validate LLM output against schema; raise ValueError if invalid."""
+    if validate is None:
+        return
+    try:
+        validate(instance=data, schema=EXPERIENCE_SPEC_SCHEMA)
+    except JsonSchemaValidationError as e:
+        msg = e.message if hasattr(e, "message") else str(e)
+        try:
+            from loguru import logger
+            logger.warning("LLM returned incomplete experience spec: {}", msg)
+        except ImportError:
+            pass
+        raise ValueError(f"Invalid experience spec: {msg}") from e
 
 
 def _get_anti_patterns(style: str) -> str:
@@ -230,9 +305,14 @@ If NO to any: REWRITE. Then output the experience spec JSON only."""
         calls_per_minute=calls_per_minute,
     )
     data = _extract_json(raw)
+    _validate_experience_spec(data)
 
     sections = [
-        SectionSpec(id=s["id"], name=s["name"], type=s.get("type", "narrative"))
+        SectionSpec(
+            id=s["id"],
+            name=s.get("name") or s.get("title", ""),
+            type=s.get("type", "narrative"),
+        )
         for s in data.get("sections", [])
     ]
     return ExperienceSpec(

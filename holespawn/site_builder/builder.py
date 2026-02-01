@@ -9,9 +9,38 @@ from typing import Any
 
 from holespawn.experience import ExperienceSpec, SectionSpec
 
+try:
+    import bleach
+except ImportError:
+    bleach = None
+
+ALLOWED_TAGS = [
+    "p", "br", "strong", "em", "a", "ul", "ol", "li",
+    "h1", "h2", "h3", "h4", "blockquote", "code", "pre",
+]
+ALLOWED_ATTRS = {"a": ["href", "title"], "code": ["class"]}
+
 
 def _escape(s: str) -> str:
     return html.escape(s, quote=True)
+
+
+def _sanitize_html(content: str) -> str:
+    """Sanitize HTML to prevent malformed or unsafe output. Plain text is escaped and wrapped in <p>."""
+    if not (content and content.strip()):
+        return ""
+    text = content.strip()
+    if text.startswith("<"):
+        if bleach is not None:
+            clean = bleach.clean(
+                text,
+                tags=ALLOWED_TAGS,
+                attributes=ALLOWED_ATTRS,
+                strip=True,
+            )
+            return clean
+        return _escape(text).replace("\n", "<br>")
+    return f"<p>{_escape(text)}</p>"
 
 
 def _render_section(spec_section: SectionSpec, content: dict | None) -> str:
@@ -37,12 +66,11 @@ def _render_section(spec_section: SectionSpec, content: dict | None) -> str:
 </section>'''
     else:
         body = content.get("body", "")
-        if body and not body.strip().startswith("<"):
-            body = f"<p>{_escape(body)}</p>"
+        body_html = _sanitize_html(body) if body else ""
         return f'''
 <section id="{section_id}" class="section section-narrative">
   <h2>{title}</h2>
-  <div class="section-body">{body}</div>
+  <div class="section-body">{body_html}</div>
 </section>'''
 
 

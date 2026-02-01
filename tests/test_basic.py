@@ -84,7 +84,12 @@ def test_cost_tracker():
     """CostTracker accumulates usage and computes cost."""
     from holespawn.cost_tracker import CostTracker
 
-    tracker = CostTracker(model="gemini-flash", warn_threshold=10.0)
+    with pytest.raises(ValueError, match="warn_threshold.*must be <= max_cost"):
+        CostTracker(model="gemini-flash", warn_threshold=10.0, max_cost=5.0)
+    with pytest.raises(ValueError, match="non-negative"):
+        CostTracker(model="gemini-flash", warn_threshold=-1.0, max_cost=5.0)
+
+    tracker = CostTracker(model="gemini-flash", warn_threshold=1.0, max_cost=10.0)
     tracker.add_usage(1000, 500, operation="test")
     assert tracker.input_tokens == 1000
     assert tracker.output_tokens == 500

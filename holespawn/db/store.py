@@ -55,36 +55,35 @@ def init_db(db_path: str | Path) -> None:
     path = _db_path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     import sqlite3
-    conn = sqlite3.connect(str(path))
-    conn.executescript(_SCHEMA)
-    try:
-        conn.execute("ALTER TABLE profiles ADD COLUMN canonical_handle TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute(
-            "UPDATE profiles SET canonical_handle = lower(trim(source_username)) WHERE canonical_handle IS NULL"
-        )
-        conn.execute(
-            "UPDATE profiles SET canonical_handle = 'unknown' WHERE canonical_handle IS NULL OR trim(canonical_handle) = ''"
-        )
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute(
-            "DELETE FROM profiles WHERE id NOT IN (SELECT max(id) FROM profiles GROUP BY coalesce(canonical_handle, 'unknown'))"
-        )
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_canonical_handle ON profiles(canonical_handle)")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    conn.close()
+    with sqlite3.connect(str(path)) as conn:
+        conn.executescript(_SCHEMA)
+        try:
+            conn.execute("ALTER TABLE profiles ADD COLUMN canonical_handle TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "UPDATE profiles SET canonical_handle = lower(trim(source_username)) WHERE canonical_handle IS NULL"
+            )
+            conn.execute(
+                "UPDATE profiles SET canonical_handle = 'unknown' WHERE canonical_handle IS NULL OR trim(canonical_handle) = ''"
+            )
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "DELETE FROM profiles WHERE id NOT IN (SELECT max(id) FROM profiles GROUP BY coalesce(canonical_handle, 'unknown'))"
+            )
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_canonical_handle ON profiles(canonical_handle)")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
 
 def store_profile(
@@ -121,8 +120,7 @@ def store_profile(
 
     import sqlite3
     init_db(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    with sqlite3.connect(str(db_path)) as conn:
         conn.execute(
             """INSERT INTO profiles
                (source_username, canonical_handle, run_id, output_dir, behavioral_matrix, engagement_brief, created_at, data_source)
@@ -139,8 +137,6 @@ def store_profile(
             (username, canonical_handle, run_id, output_dir, matrix_text, engagement_brief, created_at, data_source),
         )
         conn.commit()
-    finally:
-        conn.close()
     return run_id
 
 
@@ -160,8 +156,7 @@ def store_network_report(
 
     import sqlite3
     init_db(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    with sqlite3.connect(str(db_path)) as conn:
         conn.execute(
             """INSERT OR REPLACE INTO network_reports
                (run_id, output_dir, report_json, brief_text, created_at, source)
@@ -169,5 +164,3 @@ def store_network_report(
             (run_id, output_dir, report_json, brief_text, created_at, source),
         )
         conn.commit()
-    finally:
-        conn.close()

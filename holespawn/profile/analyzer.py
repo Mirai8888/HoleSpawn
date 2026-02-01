@@ -10,6 +10,22 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from holespawn.ingest import SocialContent
 
+# Theme frequency classification (typical social media word distribution)
+THEME_FREQUENCY_RARE_THRESHOLD = 0.08  # Below this = mentioned infrequently
+THEME_FREQUENCY_OBSESSION_THRESHOLD = 0.15  # Above this = core obsession
+
+# Emotional intensity threshold for pattern detection (VADER compound)
+EMOTIONAL_INTENSITY_THRESHOLD = 0.3
+
+# Analysis parameters
+TOP_THEMES_COUNT = 20  # Good coverage without noise
+MIN_POSTS_FOR_ANALYSIS = 5  # Minimum posts for reliable profiling
+
+try:
+    from loguru import logger
+except ImportError:
+    logger = None
+
 
 # Common stopwords (English) for theme extraction
 STOP = {
@@ -83,7 +99,11 @@ def _extract_themes(posts: list[str], top_n: int = 25) -> list[tuple[str, float]
         for w in _tokenize(post):
             if w not in STOP and len(w) > 1:
                 counter[w] += 1
-    total = sum(counter.values()) or 1
+    total = sum(counter.values())
+    if total == 0:
+        if logger:
+            logger.warning("No valid themes extracted (all stopwords)")
+        return []
     return [(w, count / total) for w, count in counter.most_common(top_n)]
 
 
@@ -182,7 +202,7 @@ def _analyze_emoji_usage(posts: list[str]) -> str:
     avg = sum(counts) / len(posts) if posts else 0
     if avg > 1.5:
         return "heavy"
-    if avg > 0.3:
+    if avg > EMOTIONAL_INTENSITY_THRESHOLD:
         return "moderate"
     return "none"
 
@@ -308,6 +328,13 @@ def _infer_aesthetic_from_style(communication_style: str) -> tuple[str, str, str
 def build_profile(content: SocialContent) -> PsychologicalProfile:
     """Build a psychological profile from ingested social content."""
     posts = list(content.iter_posts())
+    if not posts:
+        raise ValueError("Cannot build profile from empty posts list")
+    if len(posts) < MIN_POSTS_FOR_ANALYSIS and logger:
+        logger.warning(
+            "Building profile from only {} posts - results may be unreliable",
+            len(posts),
+        )
     full_text = content.full_text()
 
     themes = _extract_themes(posts)

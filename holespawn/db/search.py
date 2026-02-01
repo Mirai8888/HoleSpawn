@@ -72,12 +72,11 @@ def search_by_agenda(
         return []
 
     import sqlite3
-    conn = sqlite3.connect(str(path))
-    rows = conn.execute(
-        """SELECT id, source_username, run_id, output_dir, behavioral_matrix, engagement_brief
-           FROM profiles ORDER BY created_at DESC"""
-    ).fetchall()
-    conn.close()
+    with sqlite3.connect(str(path)) as conn:
+        rows = conn.execute(
+            """SELECT id, source_username, run_id, output_dir, behavioral_matrix, engagement_brief
+               FROM profiles ORDER BY created_at DESC"""
+        ).fetchall()
 
     if not rows:
         return []
