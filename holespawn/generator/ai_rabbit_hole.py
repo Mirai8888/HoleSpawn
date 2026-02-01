@@ -73,7 +73,7 @@ def _stream_openai(
 def _stream_google(
     context: str,
     api_key: str,
-    model: str = "gemini-1.5-flash",
+    model: str = "gemini-2.5-flash",
     max_tokens: int = 512,
 ) -> Iterator[str]:
     try:
@@ -155,7 +155,7 @@ class AIRabbitHoleGenerator:
         self.model = model or (
             "claude-3-5-haiku-20241022"
             if self.provider == "anthropic"
-            else "gemini-1.5-flash"
+            else "gemini-2.5-flash"
             if self.provider == "google"
             else "gpt-4o-mini"
         )

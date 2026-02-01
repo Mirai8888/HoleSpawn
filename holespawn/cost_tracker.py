@@ -9,8 +9,10 @@ from typing import Any
 
 # Per 1M tokens (input, output)
 PRICING: dict[str, tuple[float, float]] = {
+    "gemini-2.5-flash": (0.15, 0.60),
+    "gemini-2.0-flash": (0.10, 0.40),
     "gemini-1.5-flash": (0.075, 0.30),
-    "gemini-flash": (0.075, 0.30),
+    "gemini-flash": (0.15, 0.60),
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4o": (2.50, 10.00),
     "claude-sonnet-3.5": (3.00, 15.00),
@@ -25,7 +27,7 @@ def _normalize_model(name: str) -> str:
     for key in PRICING:
         if key in name or name in key:
             return key
-    return "gemini-flash"  # fallback cheap model
+    return "gemini-2.5-flash"  # fallback
 
 
 class CostTracker:
@@ -82,7 +84,7 @@ class CostTracker:
                 pass
 
     def get_cost(self) -> float:
-        prices = PRICING.get(self._pricing_key, PRICING["gemini-flash"])
+        prices = PRICING.get(self._pricing_key, PRICING["gemini-2.5-flash"])
         input_cost, output_cost = prices
         return (
             (self.input_tokens * input_cost / 1_000_000)

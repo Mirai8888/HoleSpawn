@@ -19,7 +19,7 @@ __pycache__/
 dist/
 build/
 
-# Generated site output
+# Generated site output (do not commit)
 output/
 outputs/
 .cache/

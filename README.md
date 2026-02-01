@@ -92,6 +92,7 @@ python -m holespawn.build_site data/sample_posts.txt -o output
 ```
 
 - **Output**: With `-o output` you get `index.html`, `styles.css`, `app.js`, **`engagement_brief.md`** (unless `--no-engagement`), **`metadata.json`**, **`profile.json`**, and **`cost_breakdown.json`**. Without `-o`, output goes to **`outputs/YYYY-MM-DD_HHMMSS_username/`** (with a `site/` subfolder for the HTML/CSS/JS). Deploy the site folder to any static host.
+- **Multi-page vs single-page**: The profile infers **browsing style** (doom_scroller, deep_diver, thread_reader, scanner, visual_browser). For doom_scroller, deep_diver, thread_reader, or 4+ specific interests, HoleSpawn builds a **multi-page "attention trap"** site (feed with linked entries, or hub with topic pages). Otherwise it builds a single-page experience. Use **`--multipage`** to force multi-page; **`--single-page`** to force single-page.
 - **Cost**: Token usage and estimated cost are printed at the end and saved in `cost_breakdown.json`. Use **`--dry-run`** to preview without making LLM calls.
 
 ### Engagement brief

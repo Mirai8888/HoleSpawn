@@ -19,6 +19,7 @@ pyyaml>=6.0
 
 # Utilities
 python-dateutil>=2.8.2
+python-dotenv>=1.0.0
 
 # Tests (optional)
 # pytest>=7.0.0

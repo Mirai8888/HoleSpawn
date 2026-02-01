@@ -15,7 +15,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "generation": {
         "max_retries": 3,
         "validation_enabled": True,
+        "max_validation_retries": 3,
         "timeout_seconds": 60,
+        "voice_matching": {
+            "enforce_vocabulary_usage": True,
+            "min_vocabulary_match": 0.2,
+            "block_generic_cryptic": True,
+            "require_interest_relevance": True,
+        },
     },
     "deployment": {
         "auto_deploy": False,

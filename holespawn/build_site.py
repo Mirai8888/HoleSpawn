@@ -20,6 +20,23 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# Load .env so API keys are available (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+try:
+    from dotenv import load_dotenv
+    _env_path = ROOT / ".env"
+    if _env_path.exists():
+        # Windows often saves .env as UTF-16; try UTF-8 first, then UTF-16
+        try:
+            with open(_env_path, encoding="utf-8") as f:
+                load_dotenv(stream=f)
+        except UnicodeDecodeError:
+            with open(_env_path, encoding="utf-16") as f:
+                load_dotenv(stream=f)
+    else:
+        load_dotenv(_env_path)
+except ImportError:
+    pass
+
 from holespawn.cache import ProfileCache
 from holespawn.config import load_config
 from holespawn.cost_tracker import CostTracker
@@ -34,6 +51,7 @@ from holespawn.profile import build_profile, PsychologicalProfile
 from holespawn.experience import get_experience_spec
 from holespawn.site_builder import get_site_content, build_site
 from holespawn.site_builder.validator import SiteValidator
+from holespawn.site_builder.pure_generator import generate_site_from_profile
 
 
 def _setup_logging(verbose: bool = False, quiet: bool = False, log_dir: Optional[Path] = None) -> None:
@@ -117,7 +135,7 @@ def _dry_run(
     # Rough cost estimate
     cfg_llm = config.get("llm", {})
     cfg_costs = config.get("costs", {})
-    model = cfg_llm.get("model", "gemini-flash")
+    model = cfg_llm.get("model", "gemini-2.5-flash")
     warn = float(cfg_costs.get("warn_threshold", 1.0))
     est_input = min(30_000, sum(len(p) for p in posts) * 2)  # rough tokens
     est_output = 6000  # spec + content + brief
@@ -240,6 +258,11 @@ Examples:
         action="store_true",
         help="Minimal output (errors only).",
     )
+    parser.add_argument(
+        "--single-page",
+        action="store_true",
+        help="Use legacy single-page template (default is dynamic multi-page by profile).",
+    )
     return parser
 
 
@@ -335,47 +358,64 @@ def main() -> None:
     # Cost tracker
     cfg_llm = config.get("llm", {})
     cfg_costs = config.get("costs", {})
-    model = cfg_llm.get("model", "gemini-flash")
+    model = cfg_llm.get("model", "gemini-2.5-flash")
     warn = float(cfg_costs.get("warn_threshold", 1.0))
     max_cost = float(cfg_costs.get("max_cost", 5.0))
     rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))
     tracker = CostTracker(model=model, warn_threshold=warn, max_cost=max_cost)
 
-    # Experience spec
-    _log("Generating experience spec...")
-    try:
-        spec = get_experience_spec(
-            content,
-            profile,
-            provider=args.provider,
-            tracker=tracker,
-            calls_per_minute=rate,
-        )
-    except ValueError as e:
-        _log(str(e))
-        sys.exit(1)
-    except Exception as e:
-        _log(f"Experience spec failed: {e}")
-        sys.exit(1)
-
-    # Site content
-    _log("Generating site content...")
-    try:
-        sections_content = get_site_content(
-            content,
-            profile,
-            spec,
-            provider=args.provider,
-            tracker=tracker,
-            calls_per_minute=rate,
-        )
-    except Exception as e:
-        _log(f"Content generation failed: {e}")
-        sys.exit(1)
-
-    # Build site files
-    build_site(spec, sections_content, site_dir)
-    _log(f"Site written to {site_dir}")
+    # Pure generation (no templates) vs legacy single-page
+    if args.single_page:
+        # Legacy path: experience spec → section content → fill template
+        _log("Generating experience spec...")
+        try:
+            spec = get_experience_spec(
+                content,
+                profile,
+                provider=args.provider,
+                tracker=tracker,
+                calls_per_minute=rate,
+            )
+        except ValueError as e:
+            _log(str(e))
+            sys.exit(1)
+        except Exception as e:
+            _log(f"Experience spec failed: {e}")
+            sys.exit(1)
+        _log("Generating legacy single-page site...")
+        try:
+            sections_content = get_site_content(
+                content,
+                profile,
+                spec,
+                provider=args.provider,
+                tracker=tracker,
+                calls_per_minute=rate,
+            )
+        except Exception as e:
+            _log(f"Content generation failed: {e}")
+            sys.exit(1)
+        build_site(spec, sections_content, site_dir)
+        _log(f"Site written to {site_dir}")
+    else:
+        # Pure generation: LLM designs structure, CSS, and content from full profile
+        _log("Building site from profile (pure generation, no templates)...")
+        try:
+            generate_site_from_profile(
+                profile,
+                site_dir,
+                content=content,
+                tracker=tracker,
+                provider=args.provider,
+                calls_per_minute=rate,
+            )
+            _log(f"Site written to {site_dir}")
+        except ValueError as e:
+            _log(str(e))
+            sys.exit(1)
+        except Exception as e:
+            _log(f"Pure generation failed: {e}")
+            sys.exit(1)
 
     # Validate
     validator = SiteValidator(site_dir)

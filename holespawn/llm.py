@@ -33,7 +33,7 @@ def get_provider_and_key(provider_override: Optional[str] = None) -> tuple[str, 
         model = os.getenv("HOLESPAWN_CLAUDE_MODEL") or "claude-3-5-sonnet-20241022"
     elif prov == "google":
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        model = os.getenv("HOLESPAWN_GEMINI_MODEL") or "gemini-1.5-flash"
+        model = os.getenv("HOLESPAWN_GEMINI_MODEL") or "gemini-2.5-flash"
     else:
         api_key = os.getenv("OPENAI_API_KEY")
         model = os.getenv("HOLESPAWN_OPENAI_MODEL") or "gpt-4o-mini"
