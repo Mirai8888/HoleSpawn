@@ -106,6 +106,25 @@ python -m holespawn.db search --agenda "interested in AI safety and rationalism"
 
 ---
 
+## DASHBOARD
+
+Web UI to browse stored profiles, run agenda search, and view network reports and briefs.
+
+**Run:**
+```bash
+pip install flask
+python -m dashboard.app
+```
+Then open http://127.0.0.1:5000
+
+- **Profiles:** List all stored profiles (run_id, username, created_at, source). Click **Brief** to open the engagement brief in a modal.
+- **Agenda search:** Enter a descriptive query and optional limit; uses the LLM to rank profiles. Results show rank, reason, and link to brief.
+- **Network reports:** List stored network analysis runs. Click **Brief** to view the network engagement brief.
+
+DB path: `HOLESPAWN_DB` env or default `outputs/holespawn.sqlite` (relative to project root).
+
+---
+
 ## APPROVED USAGE
 
 - Self-analysis

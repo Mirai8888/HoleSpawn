@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HoleSpawn — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">HoleSpawn</div>
+      <nav>
+        <button type="button" class="nav-btn active" data-panel="profiles">Profiles</button>
+        <button type="button" class="nav-btn" data-panel="search">Agenda search</button>
+        <button type="button" class="nav-btn" data-panel="network">Network reports</button>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="header">
+        <h1 id="panel-title">Profiles</h1>
+      </header>
+
+      <section id="panel-profiles" class="panel active">
+        <p class="muted">Stored profiles (behavioral matrix + engagement brief).</p>
+        <div id="profiles-loading" class="loading">Loading…</div>
+        <div id="profiles-error" class="error hidden"></div>
+        <div id="profiles-table-wrap" class="table-wrap hidden">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Run ID</th>
+                <th>Username</th>
+                <th>Created</th>
+                <th>Source</th>
+                <th>Brief</th>
+                <th>Repair</th>
+              </tr>
+            </thead>
+            <tbody id="profiles-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="panel-search" class="panel">
+        <p class="muted">Search stored profiles by descriptive agenda (requires LLM API key).</p>
+        <div class="search-form">
+          <input type="text" id="agenda-input" placeholder="e.g. interested in AI safety and rationalism" class="input">
+          <input type="number" id="search-limit" value="10" min="1" max="50" class="input narrow">
+          <button type="button" id="search-btn" class="btn">Search</button>
+        </div>
+        <div id="search-loading" class="loading hidden">Searching…</div>
+        <div id="search-error" class="error hidden"></div>
+        <div id="search-results-wrap" class="table-wrap hidden">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Run ID</th>
+                <th>Username</th>
+                <th>Reason</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="search-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="panel-network" class="panel">
+        <p class="muted">Network analysis reports (community detection + group brief).</p>
+        <div id="network-loading" class="loading">Loading…</div>
+        <div id="network-error" class="error hidden"></div>
+        <div id="network-table-wrap" class="table-wrap hidden">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Run ID</th>
+                <th>Created</th>
+                <th>Source</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="network-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-title">Brief</h2>
+        <button type="button" class="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

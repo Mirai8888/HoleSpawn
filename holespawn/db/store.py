@@ -10,13 +10,16 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_username TEXT NOT NULL,
-    run_id TEXT NOT NULL UNIQUE,
+    canonical_handle TEXT,
+    run_id TEXT NOT NULL,
     output_dir TEXT NOT NULL,
     behavioral_matrix TEXT NOT NULL,
     engagement_brief TEXT,
     created_at TEXT NOT NULL,
     data_source TEXT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_canonical_handle ON profiles(canonical_handle);
 
 CREATE TABLE IF NOT EXISTS network_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,14 +44,46 @@ def _db_path(path: str | Path) -> Path:
     return p
 
 
+def _normalize_handle(username: str) -> str:
+    """Normalize X handle for dedup: lowercase, strip @ and whitespace."""
+    s = (username or "").strip().lstrip("@").lower()
+    return s or "unknown"
+
+
 def init_db(db_path: str | Path) -> None:
-    """Create DB and tables if they don't exist."""
+    """Create DB and tables if they don't exist. Migrates existing DBs to add canonical_handle."""
     path = _db_path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     import sqlite3
     conn = sqlite3.connect(str(path))
     conn.executescript(_SCHEMA)
-    conn.commit()
+    try:
+        conn.execute("ALTER TABLE profiles ADD COLUMN canonical_handle TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute(
+            "UPDATE profiles SET canonical_handle = lower(trim(source_username)) WHERE canonical_handle IS NULL"
+        )
+        conn.execute(
+            "UPDATE profiles SET canonical_handle = 'unknown' WHERE canonical_handle IS NULL OR trim(canonical_handle) = ''"
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute(
+            "DELETE FROM profiles WHERE id NOT IN (SELECT max(id) FROM profiles GROUP BY coalesce(canonical_handle, 'unknown'))"
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_canonical_handle ON profiles(canonical_handle)")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     conn.close()
 
 
@@ -82,16 +117,26 @@ def store_profile(
         brief_path = run_dir / "engagement_brief.md"
     engagement_brief = brief_path.read_text(encoding="utf-8") if brief_path.is_file() else None
     created_at = metadata.get("generated_at", "")
+    canonical_handle = _normalize_handle(username)
 
     import sqlite3
     init_db(db_path)
     conn = sqlite3.connect(str(db_path))
     try:
         conn.execute(
-            """INSERT OR REPLACE INTO profiles
-               (source_username, run_id, output_dir, behavioral_matrix, engagement_brief, created_at, data_source)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (username, run_id, output_dir, matrix_text, engagement_brief, created_at, data_source),
+            """INSERT INTO profiles
+               (source_username, canonical_handle, run_id, output_dir, behavioral_matrix, engagement_brief, created_at, data_source)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(canonical_handle) DO UPDATE SET
+                 source_username = excluded.source_username,
+                 run_id = excluded.run_id,
+                 output_dir = excluded.output_dir,
+                 behavioral_matrix = excluded.behavioral_matrix,
+                 engagement_brief = excluded.engagement_brief,
+                 created_at = excluded.created_at,
+                 data_source = excluded.data_source
+            """,
+            (username, canonical_handle, run_id, output_dir, matrix_text, engagement_brief, created_at, data_source),
         )
         conn.commit()
     finally:

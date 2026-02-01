@@ -63,3 +63,56 @@ def get_engagement_brief(
         tracker=tracker,
         calls_per_minute=calls_per_minute,
     )
+
+
+def _profile_dict_to_context(profile: dict) -> str:
+    """Build prompt context from profile dict only (no raw narrative). For repair/refresh."""
+    lines = ["## Psychological profile (from stored matrix)", ""]
+    themes = profile.get("themes") or []
+    if themes and isinstance(themes[0], (list, tuple)):
+        theme_str = ", ".join(str(t[0]) for t in themes[:25])
+    else:
+        theme_str = ", ".join(str(t) for t in themes[:25])
+    lines.append(f"Themes: {theme_str}")
+    for key in ("sentiment_compound", "sentiment_positive", "sentiment_negative", "sentiment_neutral", "intensity"):
+        val = profile.get(key)
+        if val is not None:
+            lines.append(f"{key}: {val}")
+    lines.append(f"Communication style: {profile.get('communication_style', 'N/A')}")
+    lines.append(f"Vocabulary sample: {', '.join((profile.get('vocabulary_sample') or [])[:25])}")
+    lines.append(f"Specific interests: {', '.join((profile.get('specific_interests') or [])[:12])}")
+    lines.append(f"Obsessions: {', '.join((profile.get('obsessions') or [])[:10])}")
+    lines.append(f"Cultural references: {', '.join((profile.get('cultural_references') or [])[:10])}")
+    if profile.get("sample_phrases"):
+        lines.append("Sample phrases:")
+        for p in (profile["sample_phrases"] or [])[:15]:
+            lines.append(f'  - "{p}"')
+    lines.append("")
+    lines.append("(Raw narrative not available — generate brief from profile only.)")
+    return "\n".join(lines)
+
+
+def get_engagement_brief_from_profile(
+    profile_dict: dict,
+    *,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    tracker: Optional[CostTracker] = None,
+    calls_per_minute: int = 20,
+) -> str:
+    """
+    Generate or refresh an engagement brief from a stored profile dict only (no raw content).
+    Use for repair when the vulnerability map is missing or invalid.
+    """
+    context = _profile_dict_to_context(profile_dict)
+    user_content = "Based on this profile only (no raw narrative), output the engagement brief (markdown only, no preamble).\n\n" + context
+    return call_llm(
+        ENGAGEMENT_SYSTEM,
+        user_content,
+        provider_override=provider,
+        model_override=model,
+        max_tokens=4096,
+        operation="engagement_brief_from_profile",
+        tracker=tracker,
+        calls_per_minute=calls_per_minute,
+    )
