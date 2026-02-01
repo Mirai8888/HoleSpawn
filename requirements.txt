@@ -17,6 +17,9 @@ loguru>=0.7.0
 tqdm>=4.66.0
 pyyaml>=6.0
 
+# Network analysis (file-based only)
+networkx>=3.0
+
 # Utilities
 python-dateutil>=2.8.2
 python-dotenv>=1.0.0
