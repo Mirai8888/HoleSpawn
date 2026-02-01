@@ -4,19 +4,15 @@ tone, and structure from the subject's psychological profile and narrative.
 """
 
 import json
-import os
 import re
 from dataclasses import dataclass, field
+from typing import Optional
 
 from holespawn.context import build_context
+from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
+from holespawn.llm import call_llm
 from holespawn.profile import PsychologicalProfile
-
-try:
-    from holespawn.audience import AudienceProfile
-except ImportError:
-    AudienceProfile = None
-
 
 @dataclass
 class SectionSpec:
@@ -44,13 +40,12 @@ class ExperienceSpec:
 
 EXPERIENCE_SPEC_SYSTEM = """You are an experience designer for a personalized "rabbit hole" / ARG art piece.
 
-You receive a psychological profile and raw narrative (social media / text) of one person. Optionally you also receive **audience susceptibility** (who they follow and what that audience engages with). Your job is to infer their **personal** preferences and design an experience that fits **them** (and, if audience data is present, what their audience is most susceptible to):
+You receive a psychological profile and raw narrative (Twitter/social text) of one person. Your job is to infer their **personal** preferences and design an experience that fits **them**:
 
 - If their language and themes suggest they like **light, airy, hopeful** things → the experience should feel light and airy (aesthetic, colors, tone).
 - If they are **puzzle-oriented** (lots of questions, logic, curiosity, patterns) → the experience should include actual puzzles (riddles, ciphers, codes).
 - If they are **narrative / emotional** → focus on immersive story fragments, atmosphere, found documents.
 - If they are **exploratory / ambient** → focus on mood, discovery, minimal interaction.
-- If **audience susceptibility** is provided, shape the experience so it resonates with what this audience engages with (themes, tone, emotional triggers).
 - Match **aesthetic** to their world: minimal, maximal, organic, technical, dreamy, gritty, etc.
 - Match **tone** to their emotional profile: playful, melancholic, hopeful, uncanny, mysterious, etc.
 
@@ -76,49 +71,6 @@ Output valid JSON only, no markdown or explanation. Use this exact structure (al
 Allowed: aesthetic (light_airy, dark_dense, minimal, maximal, organic, technical, dreamy, gritty). experience_type (puzzles, narrative, exploration, mixed). tone (playful, melancholic, hopeful, uncanny, mysterious, serene, tense). puzzle_difficulty (gentle, medium, challenging). Section types: narrative, puzzle, ambient. Use 3–6 sections. Include at least one puzzle section if experience_type is puzzles or mixed."""
 
 
-def _call_ai(user_content: str, api_key: str, provider: str, model: str | None) -> str:
-    try:
-        import anthropic
-        from openai import OpenAI
-    except ImportError:
-        raise ImportError("Install anthropic and openai: pip install anthropic openai") from None
-
-    if provider == "google":
-        try:
-            from google import genai  # type: ignore
-        except ImportError:
-            raise ImportError("Install google-genai: pip install google-genai") from None
-
-        client = genai.Client(api_key=api_key)
-        resp = client.models.generate_content(
-            model=model or "gemini-1.5-flash",
-            contents=[
-                {"role": "user", "parts": [{"text": f"{EXPERIENCE_SPEC_SYSTEM}\n\n{user_content}"}]},
-            ],
-        )
-        return getattr(resp, "text", None) or ""
-    if provider == "anthropic":
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model=model or "claude-3-5-sonnet-20241022",
-            max_tokens=2048,
-            system=EXPERIENCE_SPEC_SYSTEM,
-            messages=[{"role": "user", "content": user_content}],
-        )
-        return resp.content[0].text
-    else:
-        client = OpenAI(api_key=api_key)
-        resp = client.chat.completions.create(
-            model=model or "gpt-4o-mini",
-            max_tokens=2048,
-            messages=[
-                {"role": "system", "content": EXPERIENCE_SPEC_SYSTEM},
-                {"role": "user", "content": user_content},
-            ],
-        )
-        return resp.choices[0].message.content or ""
-
-
 def _extract_json(text: str) -> dict:
     text = text.strip()
     # Remove markdown code block if present
@@ -133,33 +85,24 @@ def get_experience_spec(
     content: SocialContent,
     profile: PsychologicalProfile,
     *,
-    audience_profile: "AudienceProfile | None" = None,
-    provider: str | None = None,
-    model: str | None = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    tracker: Optional[CostTracker] = None,
+    calls_per_minute: int = 20,
 ) -> ExperienceSpec:
-    """Call AI to generate a personalized experience spec from profile + narrative (+ optional audience)."""
-    prov = "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "openai"
-    if provider and provider.lower() in ("anthropic", "claude", "openai", "google", "gemini"):
-        if provider.lower() in ("anthropic", "claude"):
-            prov = "anthropic"
-        elif provider.lower() in ("google", "gemini"):
-            prov = "google"
-        else:
-            prov = "openai"
-
-    if prov == "anthropic":
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-    elif prov == "google":
-        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-    else:
-        api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY")
-
-    audience_summary = audience_profile.summary if audience_profile else None
-    context = build_context(content, profile, audience_summary=audience_summary)
-    user_content = "Based on this profile and narrative" + (" and audience susceptibility" if audience_summary else "") + ", output the experience spec JSON.\n\n" + context
-    raw = _call_ai(user_content, api_key, prov, model)
+    """Call AI to generate a personalized experience spec from profile + narrative."""
+    context = build_context(content, profile)
+    user_content = "Based on this profile and narrative, output the experience spec JSON.\n\n" + context
+    raw = call_llm(
+        EXPERIENCE_SPEC_SYSTEM,
+        user_content,
+        provider_override=provider,
+        model_override=model,
+        max_tokens=2048,
+        operation="experience_spec",
+        tracker=tracker,
+        calls_per_minute=calls_per_minute,
+    )
     data = _extract_json(raw)
 
     sections = [

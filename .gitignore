@@ -21,6 +21,10 @@ build/
 
 # Generated site output
 output/
+outputs/
+.cache/
+logs/
+.pytest_cache/
 
 # IDE
 .idea/

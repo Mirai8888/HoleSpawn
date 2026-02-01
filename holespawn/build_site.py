@@ -1,264 +1,355 @@
 """
-Build a full personalized website from narrative input.
-CLI: prompt Individual or Following, then x.com user link, then scrape; or pass a file.
-Pipeline: ingest (scrape or file) -> optional audience map -> profile -> AI spec -> site -> optional deploy.
+Build a full personalized website from Twitter/X data.
+Twitter-only: --twitter-archive (recommended) or --twitter-username (Apify) or file.
+Pipeline: ingest -> profile -> AI spec -> site -> optional deploy.
 """
 
 import argparse
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from holespawn.ingest import load_from_file, load_from_text, SocialContent
-from holespawn.profile import build_profile
+from holespawn.cache import ProfileCache
+from holespawn.config import load_config
+from holespawn.cost_tracker import CostTracker
+from holespawn.ingest import (
+    load_from_file,
+    load_from_text,
+    load_from_twitter_archive,
+    fetch_twitter_apify,
+    SocialContent,
+)
+from holespawn.profile import build_profile, PsychologicalProfile
 from holespawn.experience import get_experience_spec
 from holespawn.site_builder import get_site_content, build_site
+from holespawn.site_builder.validator import SiteValidator
+
+
+def _setup_logging(verbose: bool = False, quiet: bool = False, log_dir: Optional[Path] = None) -> None:
+    try:
+        from loguru import logger
+        logger.remove()
+        level = "DEBUG" if verbose else ("ERROR" if quiet else "INFO")
+        logger.add(sys.stderr, level=level, format="<level>{message}</level>")
+        # Default log file in project root (logs/holespawn_*.log)
+        log_root = ROOT / "logs"
+        log_root.mkdir(parents=True, exist_ok=True)
+        logger.add(
+            str(log_root / "holespawn_{time:YYYY-MM-DD}.log"),
+            level="DEBUG",
+            rotation="500 MB",
+            retention="7 days",
+        )
+        if log_dir:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / "generation.log"
+            logger.add(str(log_file), level="DEBUG", rotation="10 MB", retention="7 days")
+    except ImportError:
+        pass
 
 
 def _log(msg: str) -> None:
-    print(msg, file=sys.stderr)
+    try:
+        from loguru import logger
+        logger.info(msg)
+    except ImportError:
+        print(msg, file=sys.stderr)
 
 
-def _prompt_scrape_x() -> tuple[SocialContent, list[str] | None, list[str] | None]:
-    """
-    Interactive: Individual or Following? then x.com link. Scrape and return
-    (content, following_handles or None, audience_posts or None).
-    """
-    from holespawn.x_scraper import parse_x_username, scrape_x_user_tweets, scrape_x_following
-
-    print()
-    print("  Individual (1)  - Scrape this user's tweets for their profile.")
-    print("  Following (2)    - Scrape this user's tweets + who they follow, map audience.")
-    while True:
-        choice = input("Select: Individual (1) or Following (2)? ").strip() or "1"
-        if choice in ("1", "2"):
-            break
-        print("Enter 1 or 2.")
-    mode = "following" if choice == "2" else "individual"
-
-    while True:
-        link = input("Enter x.com user link (e.g. https://x.com/username): ").strip()
-        username = parse_x_username(link) if link else None
-        if username:
-            break
-        print("Could not parse username. Use a link like https://x.com/username or just the username.")
-    _log(f"Username: {username}")
-
-    _log("Scraping X (this may take a moment; Nitter instances can be slow or down)...")
-    subject_tweets = scrape_x_user_tweets(username, max_tweets=100)
-    if not subject_tweets:
-        _log("No tweets scraped. Nitter may be down; try again or use a file: python -m holespawn.build_site data/posts.txt")
-        sys.exit(1)
-    content = SocialContent(posts=subject_tweets)
-    _log(f"Scraped {len(subject_tweets)} tweets for profile.")
-
-    following_handles = None
-    audience_posts = None
-    if mode == "following":
-        _log("Scraping following list...")
-        following_usernames = scrape_x_following(username, max_following=200)
-        if not following_usernames:
-            _log("Could not get following list (Nitter following page may be down). Continuing without audience map.")
-        else:
-            following_handles = following_usernames
-            _log(f"Found {len(following_handles)} following. Sampling their tweets for audience map...")
-            audience_posts = []
-            sample = min(25, len(following_handles))
-            for i, u in enumerate(following_handles[:sample]):
-                _log(f"  [{i+1}/{sample}] {u}")
-                try:
-                    audience_posts.extend(scrape_x_user_tweets(u, max_tweets=15))
-                except Exception:
-                    continue
-            _log(f"Collected {len(audience_posts)} audience tweets.")
-
-    return content, following_handles, audience_posts
+def _create_output_dir(username: str, base_dir: str = "outputs", use_site_subdir: bool = True) -> Path:
+    """Create timestamped output directory: outputs/YYYY-MM-DD_HHMMSS_username."""
+    safe = re.sub(r"[^\w\-]", "_", username.strip().lstrip("@")) or "user"
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    base = Path(base_dir)
+    base.mkdir(parents=True, exist_ok=True)
+    output_dir = base / f"{timestamp}_{safe}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if use_site_subdir:
+        (output_dir / "site").mkdir(exist_ok=True)
+    # Record latest run (file instead of symlink for Windows)
+    latest_file = base / "latest.txt"
+    latest_file.write_text(output_dir.name, encoding="utf-8")
+    return output_dir
 
 
-def main():
+def _profile_to_dict(profile: PsychologicalProfile) -> dict:
+    d = asdict(profile)
+    # themes is list[tuple] -> list[list] for JSON
+    d["themes"] = [list(t) for t in d["themes"]]
+    return d
+
+
+def _check_api_keys() -> bool:
+    if os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
+        return True
+    return False
+
+
+def _dry_run(
+    content: SocialContent,
+    username: str,
+    config: dict,
+    provider: Optional[str],
+) -> None:
+    """Preview generation without LLM calls."""
+    _log("DRY RUN — No LLM calls will be made")
+    posts = list(content.iter_posts())
+    n = len(posts)
+    _log(f"Loaded {n} posts")
+    if n == 0:
+        _log("No posts to analyze. Exiting.")
+        return
+    _log("Building profile (local only)...")
+    profile = build_profile(content)
+    themes = [t[0] for t in profile.themes[:5]]
+    _log(f"Profile preview: sentiment={profile.sentiment_compound:.2f}, top themes={', '.join(themes)}")
+    # Rough cost estimate
+    cfg_llm = config.get("llm", {})
+    cfg_costs = config.get("costs", {})
+    model = cfg_llm.get("model", "gemini-flash")
+    warn = float(cfg_costs.get("warn_threshold", 1.0))
+    est_input = min(30_000, sum(len(p) for p in posts) * 2)  # rough tokens
+    est_output = 6000  # spec + content + brief
+    tracker = CostTracker(model=model, warn_threshold=warn)
+    tracker.add_usage(est_input, est_output, operation="estimate")
+    est_cost = tracker.get_cost()
+    _log(f"Estimated cost: ${est_cost:.4f} (model={model})")
+    if est_cost > warn:
+        _log(f"Above warning threshold ${warn:.2f}")
+    base = config.get("output", {}).get("base_dir", "outputs")
+    safe = re.sub(r"[^\w\-]", "_", username.strip().lstrip("@")) or "user"
+    _log(f"Output would be: {Path(base).absolute()}/YYYY-MM-DD_HHMMSS_{safe}/")
+    _log("Remove --dry-run to generate.")
+
+
+def _deploy(site_dir: Path) -> None:
+    """Run Netlify CLI if available, else print deploy options."""
+    netlify = shutil.which("netlify")
+    if netlify:
+        _log("Running: netlify deploy --dir=" + str(site_dir))
+        r = subprocess.run(
+            [netlify, "deploy", "--dir", str(site_dir), "--prod"],
+            cwd=site_dir,
+        )
+        if r.returncode != 0:
+            _log("Netlify deploy failed. See instructions below.")
+    else:
+        _log("Netlify CLI not found. Free deploy options:")
+        _log("  1. Netlify Drop: drag the site folder to https://app.netlify.com/drop")
+        _log("  2. GitHub Pages: push the folder to a repo, Settings -> Pages")
+        _log("  3. Install Netlify CLI: npm i -g netlify-cli, then run: netlify deploy --dir=" + str(site_dir))
+
+
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="HoleSpawn — Build a personalized rabbit hole / ARG website. CLI: ingest, optional audience map, profile, AI spec, site, optional deploy.",
+        description="HoleSpawn — Build a personalized rabbit hole / ARG website from Twitter/X.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Interactive: prompts Individual or Following, then x.com link (scrapes X)
-  python -m holespawn.build_site
+  # Twitter archive (recommended)
+  python -m holespawn.build_site --twitter-archive path/to/twitter-archive.zip
 
-  # Build from file
-  python -m holespawn.build_site data/posts.txt -o output
+  # Apify (requires APIFY_API_TOKEN)
+  python -m holespawn.build_site --twitter-username @username
 
-  # Map audience from file / Bluesky
-  python -m holespawn.build_site data/posts.txt --following-file data/following.txt -o output
-  python -m holespawn.build_site data/posts.txt --following-bluesky user.bsky.social -o output
+  # Text file
+  python -m holespawn.build_site data/posts.txt
+
+  # Preview without spending money
+  python -m holespawn.build_site --twitter-archive archive.zip --dry-run
 
   # Deploy after build
-  python -m holespawn.build_site data/posts.txt -o output --deploy
-        """,
+  python -m holespawn.build_site --twitter-archive archive.zip --deploy
+
+  # Custom config
+  python -m holespawn.build_site --twitter-archive archive.zip --config my_config.yaml
+""",
     )
     parser.add_argument(
         "input",
         nargs="?",
         default=None,
-        help="Path to text/JSON file with posts. If omitted, prompts: Individual or Following, then x.com link (scrape).",
+        help="Path to text/JSON file with posts (one per line). Optional if using --twitter-archive or --twitter-username.",
+    )
+    parser.add_argument(
+        "--twitter-archive",
+        metavar="PATH",
+        default=None,
+        help="Path to Twitter/X archive ZIP (recommended).",
+    )
+    parser.add_argument(
+        "--twitter-username",
+        metavar="USERNAME",
+        default=None,
+        help="Twitter/X username (e.g. @user). Uses Apify; requires APIFY_API_TOKEN.",
     )
     parser.add_argument(
         "-o", "--output",
-        default="output",
-        help="Output directory for the generated site (default: output).",
+        default=None,
+        help="Output directory. If omitted, uses outputs/YYYY-MM-DD_HHMMSS_username/.",
+    )
+    parser.add_argument(
+        "--config",
+        default="config.yaml",
+        help="Path to config file (default: config.yaml).",
     )
     parser.add_argument(
         "--provider",
         choices=("anthropic", "openai", "google"),
         default=None,
-        help="AI provider (default: Anthropic if ANTHROPIC_API_KEY set, else OpenAI, else Google).",
+        help="AI provider (default: from env / config).",
     )
-    # Audience / following
-    parser.add_argument(
-        "--following-file",
-        metavar="PATH",
-        default=None,
-        help="File with following list: one handle per line (Bluesky, Mastodon, etc.).",
-    )
-    parser.add_argument(
-        "--following-bluesky",
-        metavar="HANDLE",
-        default=None,
-        help="Bluesky handle to fetch following from (e.g. user.bsky.social). No API key.",
-    )
-    parser.add_argument(
-        "--following-mastodon",
-        metavar="INSTANCE,USERNAME",
-        default=None,
-        help="Mastodon: instance URL and username (e.g. https://mastodon.social,user). Set MASTODON_ACCESS_TOKEN.",
-    )
-    parser.add_argument(
-        "--audience-sample",
-        type=int,
-        default=25,
-        help="When fetching posts for audience map, sample this many followed accounts (default: 25).",
-    )
-    parser.add_argument(
-        "--no-fetch-audience",
-        action="store_true",
-        help="Do not fetch posts for followed accounts; use only handle list (no Bluesky/Mastodon fetch).",
-    )
-    # Engagement brief
     parser.add_argument(
         "--no-engagement",
         action="store_true",
-        help="Skip generating engagement_brief.md (vulnerability map, DM ideas, orchestration).",
+        help="Skip generating engagement_brief.md.",
     )
-    # Deploy
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable profile caching.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview without making LLM calls or spending money.",
+    )
     parser.add_argument(
         "--deploy",
         action="store_true",
-        help="After building: run Netlify CLI if installed, else print deploy instructions.",
+        help="After building: run Netlify CLI if installed.",
     )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Debug logging.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Minimal output (errors only).",
+    )
+    return parser
+
+
+def main() -> None:
+    parser = create_parser()
     args = parser.parse_args()
 
-    content = None
-    following_handles: list[str] = []
-    audience_posts_from_scrape: list[str] | None = None
+    config = load_config(args.config)
+    _setup_logging(verbose=args.verbose, quiet=args.quiet)
 
-    if args.input and Path(args.input).exists():
+    # Resolve content source and username
+    content: Optional[SocialContent] = None
+    username = "user"
+
+    if args.twitter_archive:
+        _log("Loading from Twitter archive...")
+        content = load_from_twitter_archive(args.twitter_archive)
+        posts_list = list(content.iter_posts())
+        if not posts_list:
+            _log("No tweets found in archive. Check data/tweets.js (or tweets-part*.js) in the ZIP.")
+            sys.exit(1)
+        _log(f"Loaded {len(posts_list)} tweets from archive.")
+        username = Path(args.twitter_archive).stem.replace(" ", "_")[:50]
+    elif args.twitter_username:
+        _log("Fetching tweets via Apify...")
+        content = fetch_twitter_apify(args.twitter_username)
+        if content is None:
+            if not os.getenv("APIFY_API_TOKEN") and not os.getenv("APIFY_TOKEN"):
+                _log("Apify requires APIFY_API_TOKEN. Set it in .env or use --twitter-archive.")
+            else:
+                _log("Apify fetch failed or returned no tweets. Try --twitter-archive or check token.")
+            sys.exit(1)
+        posts_list = list(content.iter_posts())
+        _log(f"Fetched {len(posts_list)} tweets.")
+        username = args.twitter_username.strip().lstrip("@") or "user"
+    elif args.input and Path(args.input).exists():
         content = load_from_file(args.input)
         _log(f"Loaded content from {args.input}.")
+        username = Path(args.input).stem
     else:
-        # No file: interactive scrape from X.com
-        if not args.input:
-            try:
-                content, following_handles_list, audience_posts_from_scrape = _prompt_scrape_x()
-                if following_handles_list:
-                    following_handles = following_handles_list
-            except ImportError as e:
-                _log(f"Scraping requires ntscraper (and for Following: requests, beautifulsoup4). {e}")
-                sys.exit(1)
-        else:
+        if args.input:
             _log("Input file not found. Using minimal sample.")
-            content = load_from_text(
-                "I keep thinking about the same thing. The days blur. Memory is a trap. Nobody really knows anyone."
-            )
+        else:
+            _log("No data source. Use --twitter-archive PATH, --twitter-username @user, or a text file.")
+            _log("Example: python -m holespawn.build_site --twitter-archive archive.zip")
+        content = load_from_text(
+            "I keep thinking about the same thing. The days blur. Memory is a trap. Nobody really knows anyone."
+        )
 
-    if content is None:
-        content = load_from_text("")
     if not list(content.iter_posts()) and not content.raw_text:
-        _log("No content to analyze. Add posts to a file or run without args to scrape from x.com.")
+        _log("No content to analyze. Exiting.")
         sys.exit(1)
 
-    # Resolve following list (file / Bluesky / Mastodon flags, or from scrape)
-    if args.following_file:
-        try:
-            from holespawn.audience import load_following_from_file
-            following_handles = load_following_from_file(args.following_file)
-            _log(f"Loaded {len(following_handles)} handles from {args.following_file}.")
-        except ImportError:
-            _log("audience module not available. Install: pip install requests")
-            sys.exit(1)
-    if args.following_bluesky:
-        try:
-            from holespawn.audience import fetch_all_following_bluesky
-            following_handles = fetch_all_following_bluesky(args.following_bluesky, max_following=500)
-            _log(f"Fetched {len(following_handles)} Bluesky following for {args.following_bluesky}.")
-        except ImportError as e:
-            _log(f"Bluesky fetch requires requests: {e}")
-            sys.exit(1)
-        except Exception as e:
-            _log(f"Bluesky fetch failed: {e}")
-            sys.exit(1)
-    if args.following_mastodon:
-        part = args.following_mastodon.split(",", 1)
-        if len(part) != 2:
-            _log("--following-mastodon must be INSTANCE,USERNAME (e.g. https://mastodon.social,user)")
-            sys.exit(1)
-        instance_url, username = part[0].strip(), part[1].strip()
-        try:
-            from holespawn.audience import fetch_following_mastodon
-            token = os.getenv("MASTODON_ACCESS_TOKEN")
-            if not token:
-                _log("MASTODON_ACCESS_TOKEN not set. Create an app on your instance and set the token.")
-                sys.exit(1)
-            following_handles = fetch_following_mastodon(instance_url, username, limit=300)
-            _log(f"Fetched {len(following_handles)} Mastodon following for {username}.")
-        except ImportError as e:
-            _log(f"Mastodon fetch requires requests: {e}")
-            sys.exit(1)
-        except Exception as e:
-            _log(f"Mastodon fetch failed: {e}")
-            sys.exit(1)
+    # Dry run
+    if args.dry_run:
+        _dry_run(content, username, config, args.provider)
+        return
 
-    audience_profile = None
-    if following_handles or audience_posts_from_scrape:
-        try:
-            from holespawn.audience import map_audience_susceptibility
-            _log("Mapping audience susceptibility (who they follow -> what audience is susceptible to)...")
-            audience_profile = map_audience_susceptibility(
-                following_handles or [],
-                sample_size=args.audience_sample,
-                fetch_posts=not args.no_fetch_audience and not audience_posts_from_scrape,
-                existing_posts=audience_posts_from_scrape,
-            )
-            if audience_profile.summary:
-                _log(f"Audience: {audience_profile.summary[:120]}...")
-        except ImportError as e:
-            _log(f"Audience mapping requires requests: {e}")
-        except Exception as e:
-            _log(f"Audience mapping failed: {e}")
+    if not _check_api_keys():
+        _log("Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY to generate the site.")
+        sys.exit(1)
 
-    _log("Building profile...")
-    profile = build_profile(content)
+    # Output directory
+    if args.output:
+        out_dir = Path(args.output)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        site_dir = out_dir
+        use_organized = False
+    else:
+        base_dir = config.get("output", {}).get("base_dir", "outputs")
+        out_dir = _create_output_dir(username, base_dir=base_dir, use_site_subdir=True)
+        site_dir = out_dir / "site"
+        use_organized = True
+        if not args.quiet:
+            _setup_logging(verbose=args.verbose, quiet=False, log_dir=out_dir)
 
-    _log("Generating personalized experience spec (aesthetic, type, tone)...")
+    # Profile (with optional cache)
+    posts_list = list(content.iter_posts())
+    if args.no_cache:
+        _log("Building profile...")
+        profile = build_profile(content)
+    else:
+        cache = ProfileCache()
+        cached = cache.get(posts_list)
+        if cached is not None:
+            _log("Using cached profile.")
+            profile = cached
+        else:
+            _log("Building profile...")
+            profile = build_profile(content)
+            cache.set(posts_list, profile)
+
+    # Cost tracker
+    cfg_llm = config.get("llm", {})
+    cfg_costs = config.get("costs", {})
+    model = cfg_llm.get("model", "gemini-flash")
+    warn = float(cfg_costs.get("warn_threshold", 1.0))
+    max_cost = float(cfg_costs.get("max_cost", 5.0))
+    rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))
+    tracker = CostTracker(model=model, warn_threshold=warn, max_cost=max_cost)
+
+    # Experience spec
+    _log("Generating experience spec...")
     try:
         spec = get_experience_spec(
-            content, profile,
-            audience_profile=audience_profile,
+            content,
+            profile,
             provider=args.provider,
+            tracker=tracker,
+            calls_per_minute=rate,
         )
     except ValueError as e:
         _log(str(e))
@@ -267,59 +358,73 @@ Examples:
         _log(f"Experience spec failed: {e}")
         sys.exit(1)
 
-    _log("Generating site content (copy, puzzles)...")
+    # Site content
+    _log("Generating site content...")
     try:
         sections_content = get_site_content(
-            content, profile, spec,
-            audience_summary=audience_profile.summary if audience_profile else None,
+            content,
+            profile,
+            spec,
             provider=args.provider,
+            tracker=tracker,
+            calls_per_minute=rate,
         )
     except Exception as e:
         _log(f"Content generation failed: {e}")
         sys.exit(1)
 
-    out_dir = Path(args.output)
-    build_site(spec, sections_content, out_dir)
-    _log(f"Site written to {out_dir.absolute()}")
-    _log("  index.html, styles.css, app.js")
+    # Build site files
+    build_site(spec, sections_content, site_dir)
+    _log(f"Site written to {site_dir}")
 
-    # Engagement brief: vulnerability map, DM ideas, orchestration plan
+    # Validate
+    validator = SiteValidator(site_dir)
+    if not validator.validate_all():
+        _log("Site validation issues: " + "; ".join(validator.get_errors()))
+
+    # Metadata and profile (always write when we have out_dir)
+    metadata = {
+        "username": username,
+        "generated_at": datetime.now().isoformat(),
+        "version": "0.1.0",
+        "llm_model": model,
+        "data_source": "twitter_archive" if args.twitter_archive else ("apify" if args.twitter_username else "file"),
+    }
+    (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    (out_dir / "profile.json").write_text(
+        json.dumps(_profile_to_dict(profile), indent=2), encoding="utf-8"
+    )
+
+    # Engagement brief
     if not args.no_engagement:
         try:
             from holespawn.engagement import get_engagement_brief
-            _log("Generating engagement brief (vulnerability map, DM ideas, orchestration)...")
+            _log("Generating engagement brief...")
             brief = get_engagement_brief(
-                content, profile,
-                audience_profile=audience_profile,
+                content,
+                profile,
                 provider=args.provider,
+                tracker=tracker,
+                calls_per_minute=rate,
             )
-            (out_dir / "engagement_brief.md").write_text(brief.strip(), encoding="utf-8")
+            brief_path = out_dir / "engagement_brief.md"
+            brief_path.write_text(brief.strip(), encoding="utf-8")
             _log("  engagement_brief.md")
         except ValueError:
             _log("Skipping engagement brief (no API key).")
         except Exception as e:
             _log(f"Engagement brief failed: {e}")
 
+    # Cost summary
+    tracker.save_to_file(out_dir)
+    if not args.quiet:
+        tracker.print_summary()
+
     if args.deploy:
-        _deploy(out_dir)
+        _deploy(site_dir)
 
-
-def _deploy(out_dir: Path) -> None:
-    """Run Netlify CLI if available, else print free deploy options."""
-    netlify = shutil.which("netlify")
-    if netlify:
-        _log("Running: netlify deploy --dir=" + str(out_dir))
-        r = subprocess.run(
-            [netlify, "deploy", "--dir", str(out_dir), "--prod"],
-            cwd=out_dir,
-        )
-        if r.returncode != 0:
-            _log("Netlify deploy failed. See instructions below.")
-    else:
-        _log("Netlify CLI not found. Free deploy options:")
-        _log("  1. Netlify Drop: drag the output folder to https://app.netlify.com/drop")
-        _log("  2. GitHub Pages: push the folder to a repo, Settings → Pages → source: main / root")
-        _log("  3. Install Netlify CLI: npm i -g netlify-cli, then run: netlify deploy --dir=" + str(out_dir))
+    if not args.quiet:
+        _log(f"Done. Output: {out_dir.absolute()}")
 
 
 if __name__ == "__main__":

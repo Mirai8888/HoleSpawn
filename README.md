@@ -1,6 +1,6 @@
 # HoleSpawn
 
-**An artistic tool that ingests a person's social media output and generates a personalized "rabbit hole" or ARG experience—including a full website tailored to their psychological profile.**
+**An artistic tool that ingests Twitter/X output and generates a personalized "rabbit hole" or ARG experience—including a full website tailored to their psychological profile.**
 
 For entertainment and art only. Use only with **your own data** or with **explicit consent** from the subject.
 
@@ -8,14 +8,10 @@ For entertainment and art only. Use only with **your own data** or with **explic
 
 ## Concept
 
-1. **Ingest** — Feed in social posts (text export, pasted content, or structured files).
-2. **Profile** — The system analyzes language to build a psychological/behavioral profile: themes, sentiment, rhythm, obsessions, emotional tone.
-3. **Personalize** — The experience is **based on their personal profile**: if they like light and airy things, the rabbit hole feels light and airy; if they are puzzle-oriented, it contains puzzles; if they are narrative/emotional, it’s immersive story and found documents.
-4. **Spawn** — Generate either:
-   - **Real-time fragments** (streaming text), or
-   - **A full website** (HTML/CSS/JS) with narrative sections, optional puzzles, and theme-matched aesthetics—ready to deploy.
-
-The result is a rabbit hole made *for* that psyche: personalized aesthetic, tone, and content (puzzles vs narrative vs exploration).
+1. **Ingest** — Twitter/X only: **Twitter archive ZIP** (recommended) or **Apify scraper** (optional) or a text file.
+2. **Profile** — The system analyzes language to build a psychological/behavioral profile: themes, sentiment, rhythm, emotional tone.
+3. **Personalize** — The experience is **based on their personal profile**: aesthetic, tone, puzzles vs narrative.
+4. **Spawn** — A full website (HTML/CSS/JS) with narrative sections, optional puzzles, and theme-matched aesthetics—ready to deploy. Plus an **engagement brief** (vulnerability map, DM ideas, orchestration plan).
 
 ---
 
@@ -27,7 +23,7 @@ venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 ```
 
-Set an AI API key for personalized experience and website generation:
+Copy `.env.example` to `.env` and set at least one LLM key:
 
 ```bash
 set ANTHROPIC_API_KEY=your_key    # Windows
@@ -35,77 +31,101 @@ set ANTHROPIC_API_KEY=your_key    # Windows
 # or: set GOOGLE_API_KEY=your_key
 ```
 
+**Optional:** `config.yaml` in the project root controls LLM provider/model, cost thresholds, output directory, and rate limits. Run once to generate a default `config.yaml` if missing.
+
 ---
 
-## Build a full personalized website (CLI pipeline)
+## Data ingestion (Twitter/X only)
 
-**Default: interactive scrape from X.com**
+### 1. Twitter archive upload (primary / recommended)
 
-Run with no arguments; you are prompted:
-
-1. **Individual (1)** or **Following (2)?** — Scrape this user's tweets only, or also map their audience (who they follow).
-2. **Enter x.com user link** — e.g. `https://x.com/username` or just the username.
-
-The tool then scrapes X (via Nitter; no API key) and builds the site. Nitter instances can be down; if so, use a file instead or set `NITTER_INSTANCE` to a working instance URL.
+Download your Twitter/X archive from **X Settings → Your account → Download an archive**. You get a ZIP file. Use it as the data source:
 
 ```bash
-python -m holespawn.build_site
+python -m holespawn.build_site --twitter-archive path/to/twitter-archive.zip -o output
 ```
 
-**Or use a file** (no scraping):
+- The tool parses **data/tweets.js** (and **data/tweets-part0.js**, **tweets-part1.js**, etc.) inside the ZIP.
+- It handles the `window.YTD.tweets.part0 = ` wrapper and extracts **full_text** (and created_at/engagement are available in the format; we use full_text for profile building).
+- No API key required. Works offline.
+
+### 2. Apify Twitter scraper (optional / backup)
+
+If you prefer not to use an archive, you can use Apify to fetch tweets by username. This requires an **Apify** account and **APIFY_API_TOKEN** (paid/addon).
+
+1. Sign up at [apify.com](https://apify.com), get your API token.
+2. Put it in `.env` as `APIFY_API_TOKEN=your_token` or set in the environment.
+3. Run:
 
 ```bash
+python -m holespawn.build_site --twitter-username @username -o output
+```
+
+- Uses Apify actor **u6ppkMWAx2E2MpEuF** (Twitter Scraper).
+- If `APIFY_API_TOKEN` is not set, the command fails with a clear message; use `--twitter-archive` or a text file instead.
+
+### 3. Text file
+
+One post/tweet per line or blank-line-separated blocks:
+
+```bash
+python -m holespawn.build_site data/posts.txt -o output
+```
+
+Example files in `data/examples/`: `tech_optimist.txt`, `doomer.txt`, `shitposter.txt` for testing.
+
+---
+
+## Build a full personalized website
+
+Single pipeline: **ingest → profile → AI spec → site → optional deploy**.
+
+```bash
+# Twitter archive (recommended)
+python -m holespawn.build_site --twitter-archive archive.zip -o output
+
+# Apify (optional, requires APIFY_API_TOKEN)
+python -m holespawn.build_site --twitter-username @user -o output
+
+# Text file
 python -m holespawn.build_site data/sample_posts.txt -o output
 ```
 
-- **Input**: Omit for interactive X scrape, or path to text/JSON file (one post per line or blank-line blocks).
-- **Output**: `-o output` writes `index.html`, `styles.css`, `app.js`, and **`engagement_brief.md`** (see below). Deploy the folder to any static host.
+- **Output**: With `-o output` you get `index.html`, `styles.css`, `app.js`, **`engagement_brief.md`** (unless `--no-engagement`), **`metadata.json`**, **`profile.json`**, and **`cost_breakdown.json`**. Without `-o`, output goes to **`outputs/YYYY-MM-DD_HHMMSS_username/`** (with a `site/` subfolder for the HTML/CSS/JS). Deploy the site folder to any static host.
+- **Cost**: Token usage and estimated cost are printed at the end and saved in `cost_breakdown.json`. Use **`--dry-run`** to preview without making LLM calls.
 
-### Engagement brief (vulnerability map, DM ideas, orchestration)
+### Engagement brief
 
-Each build also generates **`engagement_brief.md`** in the output folder (unless you pass `--no-engagement`). It includes:
+Each build generates **`engagement_brief.md`** in the output folder. It includes:
 
-- **Vulnerability map (social-engineering lens)** — Emotional triggers, trust hooks, resistance points, and susceptibilities inferred from the profile (for designing interactions that resonate).
-- **DM / interaction ideas** — Concrete angles for opening or deepening contact (first DM, follow-ups, in-world interactions).
-- **Orchestration plan** — Phased rollout (how to introduce the rabbit hole, when to deepen, pacing, how to land).
+- **Vulnerability map (social-engineering lens)** — Emotional triggers, trust hooks, resistance points, susceptibilities.
+- **DM / interaction ideas** — Concrete angles for opening or deepening contact.
+- **Orchestration plan** — Phased rollout (introduce, deepen, land).
 
-Use this for art and ARG design only; consent and ethics apply.
+Use for art and ARG design only; consent and ethics apply.
 
-### Map audience (who they follow → what their audience is susceptible to)
+### Dry run (no LLM calls)
 
-Scroll through someone’s **following** to infer what their audience engages with; the experience spec and content are then shaped to resonate with that.
-
-**Free options (no API keys for following):**
-
-1. **File** — One handle per line (any platform). Export or paste your following list.
-   ```bash
-   python -m holespawn.build_site data/posts.txt --following-file data/following.txt -o output
-   ```
-
-2. **Bluesky** — Public API, no key. Fetches who they follow, then samples recent posts from those accounts.
-   ```bash
-   python -m holespawn.build_site data/posts.txt --following-bluesky user.bsky.social -o output
-   ```
-
-3. **Mastodon** — Free app token from your instance (Preferences → Development). Set `MASTODON_ACCESS_TOKEN`, then:
-   ```bash
-   python -m holespawn.build_site data/posts.txt --following-mastodon https://mastodon.social,username -o output
-   ```
-
-Options: `--audience-sample 30` (how many followed accounts to sample; default 25). `--no-fetch-audience` uses only the handle list (no post fetch).
-
-### Deploy (CLI)
-
-After building, deploy in one step:
+Preview what would be generated and see an estimated cost:
 
 ```bash
-python -m holespawn.build_site data/posts.txt -o output --deploy
+python -m holespawn.build_site --twitter-archive archive.zip --dry-run
 ```
 
-- If **Netlify CLI** is installed (`npm i -g netlify-cli`), runs `netlify deploy --dir=output`.
-- Otherwise prints **free deploy** options: Netlify Drop (drag folder), GitHub Pages, or install Netlify CLI.
+### Deploy
 
-The site’s look and content are driven by the subject’s profile (and, when used, audience susceptibility): colors, tone, narrative vs puzzle sections, and copy are all personalized.
+```bash
+python -m holespawn.build_site --twitter-archive archive.zip -o output --deploy
+```
+
+- If **Netlify CLI** is installed, runs `netlify deploy --dir=output`. Otherwise prints instructions (Netlify Drop, GitHub Pages).
+
+### Other flags
+
+- **`--config my_config.yaml`** — Use a custom config file.
+- **`--no-cache`** — Disable profile caching (re-analyze every time).
+- **`-v` / `--verbose`** — Debug logging.
+- **`--quiet`** — Minimal output (errors only).
 
 ---
 
@@ -120,27 +140,27 @@ python -m holespawn.demo
 ```bash
 python -m holespawn.demo --ai
 ```
-Streams AI-generated fragments; style and tone follow the profile (e.g. light/airy vs cryptic, puzzle hints vs pure narrative).
+Requires an AI API key. Streams fragments; style and tone follow the profile.
 
 ---
 
 ## API usage
 
-**Full website (personalized, deployable):**
+**Full website (Twitter archive):**
 ```python
-from holespawn.ingest import load_from_file
+from holespawn.ingest import load_from_twitter_archive, SocialContent
 from holespawn.profile import build_profile
 from holespawn.experience import get_experience_spec
 from holespawn.site_builder import get_site_content, build_site
 
-content = load_from_file("data/sample_posts.txt")
+content = load_from_twitter_archive("path/to/archive.zip")
 profile = build_profile(content)
-spec = get_experience_spec(content, profile)       # AI: aesthetic, type, sections
-sections = get_site_content(content, profile, spec)  # AI: copy, puzzles
-build_site(spec, sections, "output")               # Writes index.html, styles.css, app.js
+spec = get_experience_spec(content, profile)
+sections = get_site_content(content, profile, spec)
+build_site(spec, sections, "output")
 ```
 
-**Streaming fragments (personalized):**
+**Streaming fragments:**
 ```python
 from holespawn.generator import AIRabbitHoleGenerator
 ai_gen = AIRabbitHoleGenerator(content, profile)
@@ -150,23 +170,14 @@ for token in ai_gen.stream(interval_sec=2, max_fragments=5):
 
 ---
 
-## Tools
+## Cost tracking
 
-- **Ingest**: **Scrape X.com** (default): prompt Individual or Following, then x.com link; uses ntscraper (Nitter). No X API key. Or use a file.
-- **Profile**: Local NLP (VADER); no API key.
-- **Following list**: From X scrape (Following mode), or file, **Bluesky** (no key), **Mastodon** (free app token).
-- **Audience posts**: From X scrape (Following mode), or Bluesky public API; no key.
-- **Experience + content**: AI (Claude or OpenAI); key from env.
-- **Deploy**: Netlify CLI (free) or instructions for Netlify Drop / GitHub Pages.
-
-**Note:** X scraping uses Nitter (ntscraper). Public Nitter instances are often down; if scraping fails, use a file or set `NITTER_INSTANCE` to a working instance.
-
----
+Each run prints token usage and estimated cost (e.g. for Gemini Flash, GPT-4o-mini, Claude). Cost thresholds are configurable in `config.yaml` (`costs.warn_threshold`, `costs.max_cost`). Use `--dry-run` to avoid spending on a full generation.
 
 ## Data & Ethics
 
 - **Consent**: Only ingest content you own or have permission to use.
-- **No scraping by default**: Manual export / paste; Bluesky/Mastodon use official APIs with user consent.
+- **Twitter-only**: Use your own archive or Apify with appropriate account access.
 - **Artistic use**: Output is procedurally generated fiction, not a clinical or diagnostic tool.
 
 ---

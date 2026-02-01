@@ -73,7 +73,12 @@ def _sentiment_stats(posts: list[str]) -> tuple[float, float, float, float, floa
     vader = SentimentIntensityAnalyzer()
     compounds = []
     pos, neg, neu = [], [], []
-    for post in posts:
+    try:
+        from tqdm import tqdm
+        post_iter = tqdm(posts, desc="Analyzing posts", unit="post", leave=False)
+    except ImportError:
+        post_iter = posts
+    for post in post_iter:
         if not post.strip():
             continue
         s = vader.polarity_scores(post)

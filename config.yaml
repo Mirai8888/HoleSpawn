@@ -1,0 +1,33 @@
+# HoleSpawn configuration
+
+llm:
+  provider: anthropic  # anthropic, openai, google
+  model: claude-3-5-sonnet-20241022
+  max_tokens: 4000
+  temperature: 0.7
+
+generation:
+  max_retries: 3
+  validation_enabled: true
+  timeout_seconds: 60
+
+deployment:
+  auto_deploy: false
+  platform: netlify
+
+costs:
+  warn_threshold: 1.00
+  max_cost: 5.00
+
+output:
+  base_dir: outputs
+  keep_last_n: 10
+
+scraping:
+  method: archive
+  apify:
+    max_tweets: 200
+    include_retweets: false
+
+rate_limit:
+  calls_per_minute: 20

@@ -1,4 +1,4 @@
-# HoleSpawn — Rabbit hole / ARG generator
+# HoleSpawn — Rabbit hole / ARG generator (Twitter/X only)
 # Python 3.10+
 
 # NLP & sentiment (no API keys)
@@ -9,12 +9,16 @@ anthropic>=0.39.0
 openai>=1.0.0
 google-genai>=0.5.0
 
-# Audience mapping (following list, Bluesky/Mastodon)
-requests>=2.28.0
+# Optional: Apify Twitter scraper (--twitter-username); requires APIFY_API_TOKEN
+apify-client>=1.6.0
 
-# X.com (Twitter) scrape: user tweets + following list (Nitter-backed)
-ntscraper>=0.1.0
-beautifulsoup4>=4.12.0
+# Logging, progress, config
+loguru>=0.7.0
+tqdm>=4.66.0
+pyyaml>=6.0
 
 # Utilities
 python-dateutil>=2.8.2
+
+# Tests (optional)
+# pytest>=7.0.0

@@ -1,4 +1,4 @@
-"""Shared context builder for AI prompts: profile + narrative + optional audience."""
+"""Shared context builder for AI prompts: profile + narrative."""
 
 from holespawn.ingest import SocialContent
 from holespawn.profile import PsychologicalProfile
@@ -6,13 +6,8 @@ from holespawn.profile import PsychologicalProfile
 MAX_NARRATIVE_CHARS = 30_000
 
 
-def build_context(
-    content: SocialContent,
-    profile: PsychologicalProfile,
-    *,
-    audience_summary: str | None = None,
-) -> str:
-    """Build prompt context: profile summary + full narrative (+ optional audience susceptibility)."""
+def build_context(content: SocialContent, profile: PsychologicalProfile) -> str:
+    """Build prompt context: profile summary + full narrative."""
     lines = []
 
     themes_str = ", ".join(t[0] for t in profile.themes[:25])
@@ -32,11 +27,6 @@ def build_context(
         for phrase in profile.sample_phrases[:15]:
             lines.append(f'  - "{phrase}"')
     lines.append("")
-
-    if audience_summary:
-        lines.append("## Audience susceptibility (who they follow → what this audience is most susceptible to)")
-        lines.append(audience_summary)
-        lines.append("")
 
     raw = content.full_text()
     if len(raw) > MAX_NARRATIVE_CHARS:
