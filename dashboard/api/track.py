@@ -55,6 +55,11 @@ def track_end():
         return jsonify({"error": "trap_id and session_id required"}), 400
     trap_id = int(trap_id)
     duration = float(data.get("duration") or 0)
+    depth_raw = data.get("depth")
+    try:
+        depth = int(depth_raw) if depth_raw is not None else None
+    except (TypeError, ValueError):
+        depth = None
     monitor = _get_monitor_with_emit()
     visit = monitor.track_visit_end(
         trap_id=trap_id,
@@ -62,7 +67,7 @@ def track_end():
         duration=duration,
         exit_page=data.get("exit_page"),
         pages_visited=data.get("pages_visited"),
-        depth=data.get("depth"),
+        depth=depth,
         scroll_depth=data.get("max_scroll"),  # can be a dict or single value
         clicks=data.get("clicks"),
         time_per_page=data.get("time_per_page"),

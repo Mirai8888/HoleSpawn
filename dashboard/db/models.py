@@ -38,6 +38,7 @@ class Target(Base):
     campaign_memberships = relationship("CampaignTarget", back_populates="target", cascade="all, delete-orphan")
     visits = relationship("Visit", back_populates="target", cascade="all, delete-orphan")
     jobs = relationship("Job", back_populates="target", foreign_keys="Job.target_id")
+    engagements = relationship("Engagement", back_populates="target", cascade="all, delete-orphan")
 
 
 class Trap(Base):
@@ -199,6 +200,34 @@ class Job(Base):
     priority = Column(Integer, default=0)
 
     target = relationship("Target", back_populates="jobs", foreign_keys=[target_id])
+
+
+class Engagement(Base):
+    """Social media engagement with targets (DM, reply, channel post)."""
+
+    __tablename__ = "engagements"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    target_id = Column(Integer, ForeignKey("targets.id"), nullable=False, index=True)
+
+    platform = Column(String(32))  # discord, twitter
+    engagement_type = Column(String(32))  # dm, reply, channel_post
+
+    message_content = Column(Text)
+    reference_id = Column(String(128))  # tweet id, discord message id, etc.
+
+    included_trap = Column(Boolean, default=False)
+    framing_strategy = Column(String(64))  # mystery, curiosity, direct, social_proof, scarcity
+
+    target_responded = Column(Boolean, default=False)
+    response_time = Column(Integer)  # seconds until response
+    response_content = Column(Text)
+
+    led_to_trap_visit = Column(Boolean, default=False)
+
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+    target = relationship("Target", back_populates="engagements")
 
 
 class AuditLog(Base):

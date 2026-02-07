@@ -3,12 +3,30 @@ Campaign orchestration API: CRUD, add/remove targets, start/pause, status.
 """
 
 from datetime import datetime
+from typing import Any, Optional
+
 from flask import Blueprint, jsonify, request
 
 from dashboard.db import get_db
 from dashboard.db import operations as ops
 from dashboard.services.analytics import AnalyticsEngine
+
 from .auth import login_required, _audit
+
+
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    """Parse ISO datetime string to datetime; return None if invalid or not a string."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
 
 campaigns_bp = Blueprint("campaigns", __name__, url_prefix="/api/campaigns")
 
@@ -90,8 +108,16 @@ def update_campaign(campaign_id):
         if not c:
             return jsonify({"error": "Not found"}), 404
         for k, v in kwargs.items():
-            if hasattr(c, k):
-                setattr(c, k, v)
+            if not hasattr(c, k):
+                continue
+            if k == "orchestration_plan" and v is not None and not isinstance(v, str):
+                v = ops._json_dump(v)
+            if k in ("started_at", "ends_at") and isinstance(v, str):
+                try:
+                    v = datetime.fromisoformat(v.replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    pass
+            setattr(c, k, v)
         db.commit()
         db.refresh(c)
         _audit("campaign_update", None, {"campaign_id": campaign_id, **kwargs})
@@ -132,7 +158,7 @@ def add_targets(campaign_id):
                 campaign_id,
                 tid,
                 phase=data.get("phase", 0),
-                scheduled_deploy=datetime.fromisoformat(data["scheduled_deploy"].replace("Z", "+00:00")) if data.get("scheduled_deploy") else None,
+                scheduled_deploy=_parse_datetime(data.get("scheduled_deploy")),
                 custom_messaging=data.get("custom_messaging"),
             )
             if ct:

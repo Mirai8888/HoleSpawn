@@ -22,8 +22,8 @@ def _check_passphrase(passphrase: str) -> bool:
             return bcrypt.checkpw(passphrase.encode("utf-8"), h)
         except Exception:
             return False
-    # No auth configured: any non-empty passphrase (dev only)
-    return bool(passphrase)
+    # No auth configured: accept any submission (dev only)
+    return True
 
 
 def login_required(f):

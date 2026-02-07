@@ -19,6 +19,10 @@ google-genai>=0.5.0
 # Optional: Apify Twitter scraper (--twitter-username); requires APIFY_API_TOKEN
 apify-client>=1.6.0
 
+# Optional: Agent social engagement (Discord DMs, Twitter DMs/replies)
+discord.py>=2.0.0
+tweepy>=4.0.0
+
 # Logging, progress, config
 loguru>=0.7.0
 tqdm>=4.66.0

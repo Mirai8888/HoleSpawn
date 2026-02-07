@@ -11,6 +11,7 @@ from .models import (
     AuditLog,
     Campaign,
     CampaignTarget,
+    Engagement,
     Job,
     Network,
     Target,
@@ -434,3 +435,63 @@ def audit_log(db: Session, session_id: Optional[str], operation: str, target_id:
     db.commit()
     db.refresh(a)
     return a
+
+
+# ---- Engagements ----
+def create_engagement(
+    db: Session,
+    target_id: int,
+    platform: str,
+    engagement_type: str,
+    message_content: Optional[str] = None,
+    reference_id: Optional[str] = None,
+    included_trap: bool = False,
+    framing_strategy: Optional[str] = None,
+) -> Engagement:
+    e = Engagement(
+        target_id=target_id,
+        platform=platform,
+        engagement_type=engagement_type,
+        message_content=message_content,
+        reference_id=reference_id,
+        included_trap=included_trap,
+        framing_strategy=framing_strategy,
+    )
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+    return e
+
+
+def get_engagement(db: Session, engagement_id: int) -> Optional[Engagement]:
+    return db.query(Engagement).filter(Engagement.id == engagement_id).first()
+
+
+def list_engagements_for_target(
+    db: Session,
+    target_id: int,
+    limit: int = 100,
+) -> List[Engagement]:
+    return (
+        db.query(Engagement)
+        .filter(Engagement.target_id == target_id)
+        .order_by(desc(Engagement.sent_at))
+        .limit(limit)
+        .all()
+    )
+
+
+def update_engagement(
+    db: Session,
+    engagement_id: int,
+    **kwargs: Any,
+) -> Optional[Engagement]:
+    e = get_engagement(db, engagement_id)
+    if not e:
+        return None
+    for k, v in kwargs.items():
+        if hasattr(e, k):
+            setattr(e, k, v)
+    db.commit()
+    db.refresh(e)
+    return e
