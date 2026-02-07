@@ -148,6 +148,121 @@ Full documentation: [docs/C2_DASHBOARD.md](docs/C2_DASHBOARD.md).
 
 ---
 
+## AUTONOMOUS COGNITIVE OPERATIONS
+
+**SEITHAR PROTOCOL: UNSUPERVISED SUBSTRATE MANIPULATION**
+
+The system supports autonomous operation mode for extended engagement cycles without operator intervention.
+
+### INVOCATION
+```bash
+python -m holespawn.agent.cli run \
+  --goal "operational_objective" \
+  --criteria '{"threshold_parameters": "values"}' \
+  --data substrate_manifest.json \
+  --model inference_backend
+```
+
+### OPERATIONAL SEQUENCE
+
+**Cycle 1-3: Matrix Construction**
+- Subject behavioral pattern extraction (n=10-50)
+- Network graph topology analysis
+- Vulnerability surface mapping
+- Temporal engagement windows identification
+
+**Cycle 4-7: Initial Contact Protocol**
+- Platform-native communication channel utilization
+- Subject-matched linguistic pattern deployment
+- Baseline rapport establishment
+- Response probability assessment
+
+**Cycle 8-12: Architecture Integration**
+- Subject-specific binding structure synthesis
+- Deployment infrastructure provisioning
+- Distribution vector selection
+- Link transmission via established trust channels
+
+**Cycle 13-17: Metric Collection**
+- Engagement depth quantification
+- Session duration measurement
+- Return frequency observation
+- Binding effectiveness scoring (0-100 scale)
+
+**Cycle 18-20: Parametric Refinement**
+- Conversion funnel analysis (contact → response → visit → binding)
+- Framing protocol efficacy assessment
+- Subject typology → architecture mapping
+- High-performing pattern identification and replication
+
+### ENGAGEMENT INFRASTRUCTURE
+
+System requires authenticated platform access:
+```bash
+# Discord
+export DISCORD_BOT_TOKEN="authentication_credential"
+
+# Twitter/X
+export TWITTER_API_KEY="credential_1"
+export TWITTER_API_SECRET="credential_2"
+export TWITTER_ACCESS_TOKEN="credential_3"
+export TWITTER_ACCESS_SECRET="credential_4"
+
+# Inference
+export ANTHROPIC_API_KEY="credential_5"
+# Or local: LLM_API_BASE, LLM_MODEL
+
+# Database
+python -m dashboard init-db
+```
+
+### CONTACT VECTORS
+
+| Vector | Platform | Function |
+|--------|----------|----------|
+| Direct messaging | Discord, Twitter | 1:1 communication channel |
+| Public reply | Twitter | Social proof mechanism |
+| Channel participation | Discord | Context integration |
+| Activity monitoring | Both | Temporal synchronization |
+
+**Linguistic Optimization:** Vocabulary matching, syntax pattern replication, interest domain alignment, vulnerability hook activation.
+
+**Psychological Framing Protocols:** Mystery (information gap), Curiosity (incomplete pattern), Social proof (network consensus), Scarcity (limited access), Direct (minimal friction).
+
+### EFFECTIVENESS METRICS
+
+- **Contact Success Rate (CSR)** = responses / messages_sent — target CSR > 0.50
+- **Binding Conversion Rate (BCR)** = trap_visits / contacts_responded — target BCR > 0.60
+- **Effectiveness Score (ES)** = Σ(session_duration, page_depth, return_frequency) on 0-100 scale — target ES > 70
+
+### LEARNING FUNCTION
+
+Agent extracts patterns across iterations: profile type → optimal framing, temporal → contact timing, network position → strategy selection. Output: refined message parameters, framing weights, architecture optimization vectors, subject prioritization scores.
+
+### CONFIGURATION SCHEMA
+
+Success criteria (JSON): `minimum_effectiveness_score`, `minimum_successful_bindings`, `minimum_contact_response_rate`, `minimum_visit_conversion_rate`. Operational parameters: `maximum_cycles` (default 20), platforms.
+
+### OPERATIONAL CONSTRAINTS
+
+**Technical:** Platform rate limits (Discord, Twitter). LLM and storage scale with subject count.
+
+**Methodological:** Subject consent not architecturally enforced. Platform ToS not programmatically validated. Ethical oversight not implemented in base configuration.
+
+**Legal:** Jurisdiction-dependent. Platform policy compliance user-specified.
+
+### SYSTEM BEHAVIOR
+
+The autonomous agent executes complete operational cycles without human supervision. Subject interaction, architecture generation, deployment, and effectiveness assessment proceed automatically until success thresholds are met or cycle limit is reached. All engagement is recorded; all deployments logged; all metrics quantified.
+
+Complete technical documentation: [docs/AUTONOMOUS_OPERATIONS.md](docs/AUTONOMOUS_OPERATIONS.md).
+
+**FIELD DATA:** Test phase ongoing. Cycle stability confirmed. Learning function operational. Unsupervised execution stable. Mechanism awareness does not prevent mechanism efficacy.
+
+認知作戦
+
+---
+
 ## APPROVED USAGE
 
 - Self-analysis
