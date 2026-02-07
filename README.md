@@ -112,39 +112,23 @@ python -m holespawn.db search --agenda "interested in AI safety and rationalism"
 
 ## DASHBOARD
 
-Web UI to browse stored profiles, run agenda search, and view network reports and briefs.
-
-**Run:**
-```bash
-pip install flask
-python -m dashboard.app
-```
-Then open http://127.0.0.1:5000
-
-- **Profiles:** List all stored profiles (run_id, username, created_at, source). Click **Brief** to open the engagement brief in a modal.
-- **Agenda search:** Enter a descriptive query and optional limit; uses the LLM to rank profiles. Results show rank, reason, and link to brief.
-- **Network reports:** List stored network analysis runs. Click **Brief** to view the network engagement brief.
-
-DB path: `HOLESPAWN_DB` env or default `outputs/holespawn.sqlite` (relative to project root).
-
----
-
-## C2 DASHBOARD
-
-Command and control interface for operations: target management, trap generation, campaigns, and visit tracking.
+Web UI for research and operations: profile/agenda/network browsing, target management, trap generation, campaigns, and visit tracking.
 
 ```bash
 # Initialize and start
 python -m dashboard init-db
 python -m dashboard serve
 
-# Start background worker (separate terminal)
+# Background worker (separate terminal, for job queue)
 python -m dashboard worker
 ```
 
-Access at: **http://localhost:5000** (login with any passphrase in dev when `DASHBOARD_PASSPHRASE` is not set).
+Access: **http://localhost:5000** (login with any passphrase in dev when `DASHBOARD_PASSPHRASE` is not set).
 
-Full documentation: [docs/C2_DASHBOARD.md](docs/C2_DASHBOARD.md).
+- **Profiles / agenda search:** Stored profiles, LLM-ranked agenda search, engagement briefs, network reports.
+- **C2:** Targets, traps, campaigns, intel, visit tracking; worker runs trap generation and deployment jobs.
+
+DB: `HOLESPAWN_DB` env or default `outputs/holespawn.sqlite`. Full documentation: [docs/C2_DASHBOARD.md](docs/C2_DASHBOARD.md).
 
 ---
 
