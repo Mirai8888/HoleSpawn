@@ -1,0 +1,131 @@
+{
+  "user_id": "123456789012345678",
+  "username": "curious_dev",
+  "messages": [
+    {
+      "content": "honestly the new API is so much better than the old one, we've been struggling with rate limits for months",
+      "timestamp": "2024-01-15T14:32:00Z",
+      "channel_id": "ch_general",
+      "channel_name": "general",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["👍", "🔥"]
+    },
+    {
+      "content": "tbh idk why everyone is still using the legacy stack when the new stuff is clearly faster",
+      "timestamp": "2024-01-15T18:20:00Z",
+      "channel_id": "ch_general",
+      "channel_name": "general",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["😂"]
+    },
+    {
+      "content": "feel like we're all missing something obvious about the auth flow. has anyone actually read the spec?",
+      "timestamp": "2024-01-16T09:15:00Z",
+      "channel_id": "ch_help",
+      "channel_name": "help",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["🤔", "👀"]
+    },
+    {
+      "content": "shipped a small fix today. users were hitting the edge case we discussed last week. still anxious about the next release",
+      "timestamp": "2024-01-16T21:00:00Z",
+      "channel_id": "ch_general",
+      "channel_name": "general",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["🚀", "💪"]
+    },
+    {
+      "content": "the docs say one thing but the implementation does another. classic",
+      "timestamp": "2024-01-17T11:45:00Z",
+      "channel_id": "ch_rants",
+      "channel_name": "rants",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["💯"]
+    },
+    {
+      "content": "actually I think the real issue is we're optimizing for the wrong metric. what do you all think?",
+      "timestamp": "2024-01-17T15:30:00Z",
+      "channel_id": "ch_general",
+      "channel_name": "general",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["🧠", "👍"]
+    },
+    {
+      "content": "lmao just saw the merge. that's going to break prod and we all know it",
+      "timestamp": "2024-01-18T10:00:00Z",
+      "channel_id": "ch_rants",
+      "channel_name": "rants",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["😬", "🔥"]
+    },
+    {
+      "content": "imo we need to stop adding features and fix the foundation first. but that's just me",
+      "timestamp": "2024-01-18T16:22:00Z",
+      "channel_id": "ch_general",
+      "channel_name": "general",
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "reactions": ["👍", "👍", "💯"]
+    }
+  ],
+  "reactions_given": [
+    {
+      "message_id": "msg_1",
+      "emoji": "🔥",
+      "message_content": "this is the way. we've been doing it wrong for years",
+      "timestamp": "2024-01-14T20:00:00Z"
+    },
+    {
+      "message_id": "msg_2",
+      "emoji": "👍",
+      "message_content": "agreed, the foundation matters more than features",
+      "timestamp": "2024-01-15T09:00:00Z"
+    },
+    {
+      "message_id": "msg_3",
+      "emoji": "😬",
+      "message_content": "prod is on fire again. who touched the config?",
+      "timestamp": "2024-01-16T14:00:00Z"
+    }
+  ],
+  "servers": [
+    {
+      "server_id": "srv_tech",
+      "server_name": "Build in Public Devs",
+      "join_date": "2023-06-01T00:00:00Z",
+      "activity_level": "high"
+    },
+    {
+      "server_id": "srv_gaming",
+      "server_name": "Indie Game Devs",
+      "join_date": "2023-09-15T00:00:00Z",
+      "activity_level": "medium"
+    }
+  ],
+  "interactions": [
+    {
+      "user_id": "u_2",
+      "username": "other_dev",
+      "interaction_count": 24,
+      "channels": ["general", "help"]
+    },
+    {
+      "user_id": "u_3",
+      "username": "senior_eng",
+      "interaction_count": 18,
+      "channels": ["general", "rants"]
+    }
+  ],
+  "activity_patterns": {
+    "peak_hours": [14, 15, 16, 21],
+    "active_days": [1, 2, 3, 4, 5],
+    "message_frequency": 4.2
+  }
+}

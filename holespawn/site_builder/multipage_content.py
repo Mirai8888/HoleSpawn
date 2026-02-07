@@ -155,12 +155,24 @@ def generate_multipage_content(
     hook_templates = _hook_templates_by_type(browsing, comm)
 
     structure_hint = "feed" if browsing == "doom_scroller" else "hub"
+    # Discord context for uncanny personalization (when profile has Discord signals)
+    tribal = getattr(profile, "tribal_affiliations", [])[:8]
+    reaction_triggers = getattr(profile, "reaction_triggers", [])[:6]
+    intimacy = getattr(profile, "conversational_intimacy", "")
+    discord_block = ""
+    if tribal or reaction_triggers or intimacy:
+        discord_block = """
+Discord context (if available — use for deeper personalization; content should feel like it understands their Discord presence, not just public persona):
+- Servers / community themes: """ + (", ".join(tribal) if tribal else "N/A") + """
+- Themes they react to emotionally: """ + (", ".join(reaction_triggers) if reaction_triggers else "N/A") + """
+- Conversational intimacy: """ + (intimacy or "N/A") + """. Mirror their actual conversational patterns from messages. Reference server-specific context subtly. Use language/references from their community.
+"""
     user_content = f"""Voice guide:
 {voice_guide}
 
 Profile summary and narrative:
 {context[:12000]}
-
+{discord_block}
 INFINITE RABBIT HOLE — no resolution, only deeper questions.
 
 Their profile:

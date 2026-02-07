@@ -16,6 +16,8 @@ class SocialContent:
 
     posts: list[str] = field(default_factory=list)
     raw_text: str = ""
+    # Optional Discord export payload; when set, profile building uses Discord-specific signals
+    discord_data: dict | None = None
 
     def iter_posts(self) -> Iterator[str]:
         for p in self.posts:

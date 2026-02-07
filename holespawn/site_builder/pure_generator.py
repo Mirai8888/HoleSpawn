@@ -47,6 +47,12 @@ def _profile_for_design_prompt(profile: PsychologicalProfile) -> dict[str, Any]:
     p["link_following_likelihood"] = getattr(profile, "link_following_likelihood", "medium")
     p["avg_sentence_length"] = getattr(profile, "avg_sentence_length", 15.0)
     p["avg_word_length"] = getattr(profile, "avg_word_length", 4.5)
+    # Discord-specific (for design personalization)
+    p["tribal_affiliations"] = getattr(profile, "tribal_affiliations", [])[:12]
+    p["reaction_triggers"] = getattr(profile, "reaction_triggers", [])[:10]
+    p["conversational_intimacy"] = getattr(profile, "conversational_intimacy", "moderate")
+    p["community_role"] = getattr(profile, "community_role", "participant")
+    p["engagement_rhythm"] = getattr(profile, "engagement_rhythm", {})
     return p
 
 
@@ -195,6 +201,13 @@ EXAMPLES OF BEAUTIFUL, DISTINCT SITES (vary your output; do not copy):
 - Terminal/tech: Dark bg, monospace, accent color for links, tight spacing (e.g. dev docs, CLI aesthetics).
 - Playful/chaotic: Bright accents, varied weights, asymmetric layout, high energy (e.g. meme-adjacent, youth brands).
 
+When Discord data is available in the profile (tribal_affiliations, reaction_triggers, conversational_intimacy, community_role, engagement_rhythm):
+- Use tribal affiliations to inform aesthetic (match community vibe of their servers).
+- Use conversational style from their messages (not tweet style) for copy voice.
+- Reference server themes subtly in visual callbacks (color, tone).
+- Match engagement rhythm in pacing/density (peak_hours, message_frequency).
+- Adjust intimacy level of content based on their conversational_intimacy (guarded vs open vs vulnerable).
+
 REQUIRED CSS COVERAGE (you must include styles for all of these; the site HTML uses these class names):
 - :root with variables (e.g. --color-bg, --color-text, --color-accent, --color-secondary, --font, or similar).
 - * { box-sizing: border-box; }
@@ -261,6 +274,16 @@ def generate_design_system(
         f"- Cultural references: {', '.join(p['cultural_references'][:8]) if p['cultural_references'] else 'N/A'}",
         f"- Sentiment: {p['sentiment_compound']:.2f}, Intensity: {p['intensity']:.2f}",
     ]
+    # Discord context (when profile from Discord data)
+    if p.get("tribal_affiliations") or p.get("reaction_triggers") or p.get("engagement_rhythm"):
+        user_parts.extend([
+            "",
+            "DISCORD CONTEXT (use for community vibe, pacing, intimacy):",
+            f"- Servers / tribal affiliations: {', '.join(p.get('tribal_affiliations', [])[:10]) or 'N/A'}",
+            f"- Reaction triggers (what resonates): {', '.join(p.get('reaction_triggers', [])[:8]) or 'N/A'}",
+            f"- Conversational intimacy: {p.get('conversational_intimacy', 'moderate')}, Community role: {p.get('community_role', 'participant')}",
+            f"- Engagement rhythm: {p.get('engagement_rhythm') or 'N/A'}",
+        ])
     if spec is not None:
         user_parts.extend([
             "",

@@ -46,6 +46,7 @@ from holespawn.ingest import (
     load_from_text,
     load_from_twitter_archive,
     fetch_twitter_apify,
+    load_from_discord,
     SocialContent,
 )
 from holespawn.profile import build_profile, PsychologicalProfile
@@ -112,6 +113,8 @@ def _profile_to_dict(profile: PsychologicalProfile) -> dict:
 def _check_api_keys() -> bool:
     if os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
         return True
+    if os.getenv("LLM_API_BASE"):
+        return True  # local OpenAI-compatible endpoint
     return False
 
 
@@ -230,6 +233,30 @@ Examples:
         help="AI provider (default: from env / config).",
     )
     parser.add_argument(
+        "--discord",
+        metavar="PATH",
+        default=None,
+        help="Path to Discord export JSON. Uses NLP+LLM hybrid profile when set.",
+    )
+    parser.add_argument(
+        "--local-model",
+        choices=("ollama-llama3", "ollama-mistral", "lmstudio", "vllm"),
+        default=None,
+        help="Use a local model preset (OpenAI-compatible API).",
+    )
+    parser.add_argument(
+        "--model-endpoint",
+        metavar="URL",
+        default=None,
+        help="Custom LLM API base URL (e.g. http://localhost:11434/v1 for Ollama).",
+    )
+    parser.add_argument(
+        "--model-name",
+        metavar="NAME",
+        default=None,
+        help="Model name for --model-endpoint or local preset.",
+    )
+    parser.add_argument(
         "--no-engagement",
         action="store_true",
         help="Skip generating binding_protocol.md.",
@@ -280,11 +307,36 @@ def main() -> None:
     config = load_config(args.config)
     _setup_logging(verbose=args.verbose, quiet=args.quiet)
 
+    # Local model: set env so all call_llm use this endpoint
+    if args.local_model or args.model_endpoint or args.model_name:
+        from holespawn.config import get_llm_config
+        llm_cfg = get_llm_config(
+            preset=args.local_model,
+            api_base=args.model_endpoint,
+            model=args.model_name,
+        )
+        if llm_cfg.get("api_base"):
+            os.environ["LLM_API_BASE"] = llm_cfg["api_base"]
+        if llm_cfg.get("model"):
+            os.environ["LLM_MODEL"] = llm_cfg["model"]
+
     # Resolve content source and username
     content: Optional[SocialContent] = None
     username = "user"
+    discord_data: Optional[dict] = None
 
-    if args.twitter_archive:
+    if getattr(args, "discord", None) and Path(args.discord).exists():
+        _log("Loading Discord export...")
+        with open(args.discord, encoding="utf-8") as f:
+            discord_data = json.load(f)
+        content = load_from_discord(discord_data)
+        posts_list = list(content.iter_posts())
+        if not posts_list:
+            _log("No messages in Discord export. Exiting.")
+            sys.exit(1)
+        _log(f"Loaded {len(posts_list)} messages from Discord.")
+        username = (discord_data.get("username") or discord_data.get("user_id") or "discord_user")[:50]
+    elif args.twitter_archive:
         _log("Loading from Twitter archive...")
         content = load_from_twitter_archive(args.twitter_archive)
         posts_list = list(content.iter_posts())
@@ -351,9 +403,39 @@ def main() -> None:
         if not args.quiet:
             _setup_logging(verbose=args.verbose, quiet=False, log_dir=out_dir)
 
-    # Profile (with optional cache)
+    # Cost tracker (needed for Discord hybrid profile LLM calls)
+    cfg_llm = config.get("llm", {})
+    cfg_costs = config.get("costs", {})
+    model = cfg_llm.get("model", "claude-3-5-sonnet-20241022")
+    if os.getenv("LLM_MODEL"):
+        model = os.getenv("LLM_MODEL")
+    def _cost_env(name: str, default: float) -> float:
+        v = os.getenv(name)
+        if v is None or not (v and str(v).strip()):
+            return default
+        try:
+            return float(str(v).strip())
+        except ValueError:
+            return default
+    warn = _cost_env("COST_WARN_THRESHOLD", float(cfg_costs.get("warn_threshold", 1.0)))
+    max_cost = _cost_env("COST_MAX_THRESHOLD", float(cfg_costs.get("max_cost", 5.0)))
+    rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))
+    tracker = CostTracker(model=model, warn_threshold=warn, max_cost=max_cost)
+
+    # Profile (with optional cache); Discord uses NLP+LLM hybrid
     posts_list = list(content.iter_posts())
-    if args.no_cache:
+    if discord_data is not None:
+        _log("Building Discord profile (NLP + LLM hybrid)...")
+        from holespawn.profile.discord_profile_builder import build_discord_profile
+        profile = build_discord_profile(
+            discord_data,
+            use_nlp=True,
+            use_llm=True,
+            use_local=bool(getattr(args, "local_model", None)),
+            local_preset=getattr(args, "local_model", None),
+            tracker=tracker,
+        )
+    elif args.no_cache:
         _log("Building profile...")
         profile = build_profile(content)
     else:
@@ -366,31 +448,6 @@ def main() -> None:
             _log("Building profile...")
             profile = build_profile(content)
             cache.set(posts_list, profile)
-
-    # Cost tracker (env overrides config: COST_WARN_THRESHOLD, COST_MAX_THRESHOLD)
-    cfg_llm = config.get("llm", {})
-    cfg_costs = config.get("costs", {})
-    model = cfg_llm.get("model", "gemini-2.5-flash")
-    def _cost_env(name: str, default: float) -> float:
-        v = os.getenv(name)
-        if v is None or not v.strip():
-            return default
-        try:
-            return float(v.strip())
-        except ValueError:
-            try:
-                from loguru import logger
-                logger.warning(
-                    "Invalid {} value '{}' - must be a number. Using default: {}",
-                    name, v, default,
-                )
-            except ImportError:
-                pass
-            return default
-    warn = _cost_env("COST_WARN_THRESHOLD", float(cfg_costs.get("warn_threshold", 1.0)))
-    max_cost = _cost_env("COST_MAX_THRESHOLD", float(cfg_costs.get("max_cost", 5.0)))
-    rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))
-    tracker = CostTracker(model=model, warn_threshold=warn, max_cost=max_cost)
 
     # Pure generation (no templates) vs legacy single-page
     if args.single_page:

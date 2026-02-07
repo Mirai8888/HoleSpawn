@@ -1,9 +1,67 @@
 """
 Load and default configuration (config.yaml).
+Local model presets for OpenAI-compatible endpoints (Ollama, LM Studio, vLLM).
 """
 
+import os
 from pathlib import Path
 from typing import Any
+
+# Local model presets (OpenAI-compatible API)
+LOCAL_MODEL_PRESETS: dict[str, dict[str, Any]] = {
+    "ollama-llama3": {
+        "api_base": "http://localhost:11434/v1",
+        "model": "llama3.1:8b",
+        "provider": "openai_compatible",
+        "notes": "Good balance of speed and quality",
+    },
+    "ollama-mistral": {
+        "api_base": "http://localhost:11434/v1",
+        "model": "mistral:7b",
+        "provider": "openai_compatible",
+        "notes": "Faster, lighter weight",
+    },
+    "lmstudio": {
+        "api_base": "http://localhost:1234/v1",
+        "model": "local-model",
+        "provider": "openai_compatible",
+        "notes": "LM Studio default endpoint",
+    },
+    "vllm": {
+        "api_base": "http://localhost:8000/v1",
+        "model": "meta-llama/Meta-Llama-3-8B-Instruct",
+        "provider": "openai_compatible",
+        "notes": "Production local inference",
+    },
+}
+
+
+def get_llm_config(
+    preset: str | None = None,
+    api_base: str | None = None,
+    model: str | None = None,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """
+    Get LLM configuration for local or cloud models.
+    Priority: explicit params > preset > env vars (LLM_API_BASE, LLM_MODEL) > default (Claude).
+    """
+    if preset and preset in LOCAL_MODEL_PRESETS:
+        config = dict(LOCAL_MODEL_PRESETS[preset])
+    else:
+        config = {
+            "api_base": api_base or os.getenv("LLM_API_BASE"),
+            "model": model or os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022"),
+            "provider": provider or "anthropic",
+        }
+    if api_base is not None:
+        config["api_base"] = api_base
+    if model is not None:
+        config["model"] = model
+    if config.get("api_base"):
+        config["provider"] = config.get("provider") or "openai_compatible"
+    return config
+
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "llm": {

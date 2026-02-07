@@ -58,6 +58,27 @@ def build_context(content: SocialContent, profile: PsychologicalProfile) -> str:
         lines.append("Sample phrases from subject:")
         for phrase in profile.sample_phrases[:15]:
             lines.append(f'  - "{phrase}"')
+
+    # Discord context (when profile was built from Discord data)
+    tribal = _get_profile_attr(profile, "tribal_affiliations", [])
+    reaction_triggers = _get_profile_attr(profile, "reaction_triggers", [])
+    intimacy = _get_profile_attr(profile, "conversational_intimacy", "")
+    community_role = _get_profile_attr(profile, "community_role", "")
+    rhythm = _get_profile_attr(profile, "engagement_rhythm", {})
+    if tribal or reaction_triggers or intimacy or community_role or rhythm:
+        lines.append("## Discord context (if available)")
+        if tribal:
+            lines.append(f"Servers / tribal affiliations: {', '.join(tribal[:12])}")
+        if reaction_triggers:
+            lines.append(f"Themes they react to emotionally: {', '.join(reaction_triggers[:10])}")
+        if intimacy:
+            lines.append(f"Conversational intimacy: {intimacy}")
+        if community_role:
+            lines.append(f"Community role: {community_role}")
+        if rhythm:
+            lines.append(f"Engagement rhythm: {rhythm}")
+        lines.append("")
+
     lines.append("")
 
     raw = content.full_text()

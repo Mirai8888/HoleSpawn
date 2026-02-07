@@ -88,6 +88,13 @@ class PsychologicalProfile:
     layout_style: str = "balanced"
     typography_vibe: str = "clean sans"
 
+    # Discord-specific (when content.discord_data is present)
+    tribal_affiliations: list[str] = field(default_factory=list)  # Server themes/values
+    reaction_triggers: list[str] = field(default_factory=list)  # What gets emotional response
+    conversational_intimacy: str = "moderate"  # guarded | open | vulnerable
+    community_role: str = "participant"  # lurker | participant | leader
+    engagement_rhythm: dict = field(default_factory=dict)  # Activity patterns (peak_hours, etc.)
+
 
 def _tokenize(text: str) -> list[str]:
     return re.findall(r"\b[a-z0-9']+\b", text.lower())
@@ -325,6 +332,89 @@ def _infer_aesthetic_from_style(communication_style: str) -> tuple[str, str, str
     return aesthetics.get(communication_style, ("neutral", "balanced", "clean sans"))
 
 
+def _extract_discord_signals(discord_data: dict) -> dict:
+    """
+    Extract Discord-specific profile signals from export payload.
+    Returns dict with tribal_affiliations, reaction_triggers, conversational_intimacy,
+    community_role, engagement_rhythm.
+    """
+    out: dict = {
+        "tribal_affiliations": [],
+        "reaction_triggers": [],
+        "conversational_intimacy": "moderate",
+        "community_role": "participant",
+        "engagement_rhythm": {},
+    }
+    if not discord_data:
+        return out
+
+    # Tribal affiliations: server names as community themes
+    servers = discord_data.get("servers") or []
+    for s in servers:
+        if isinstance(s, dict) and s.get("server_name"):
+            out["tribal_affiliations"].append(str(s["server_name"]).strip())
+        elif isinstance(s, str):
+            out["tribal_affiliations"].append(s.strip())
+    out["tribal_affiliations"] = list(dict.fromkeys(out["tribal_affiliations"]))[:15]
+
+    # Reaction triggers: themes from messages they reacted to (reactions_given.message_content)
+    reactions_given = discord_data.get("reactions_given") or []
+    reacted_contents: list[str] = []
+    for r in reactions_given:
+        if isinstance(r, dict) and r.get("message_content"):
+            reacted_contents.append(str(r["message_content"]).strip()[:200])
+    if reacted_contents:
+        # Simple word extraction for themes they emotionally engage with
+        combined = " ".join(reacted_contents).lower()
+        words = re.findall(r"\b[a-z]{4,}\b", combined)
+        from collections import Counter
+        stop = STOP | {"this", "that", "what", "when", "with", "from", "have", "been", "were", "about"}
+        counts = Counter(w for w in words if w not in stop)
+        out["reaction_triggers"] = [w for w, _ in counts.most_common(12)]
+
+    # Conversational intimacy: from message length and vulnerability markers
+    messages = discord_data.get("messages") or []
+    if messages:
+        contents = []
+        for m in messages:
+            if isinstance(m, dict) and m.get("content"):
+                contents.append(str(m["content"]))
+        if contents:
+            avg_len = sum(len(c.split()) for c in contents) / len(contents)
+            combined = " ".join(contents).lower()
+            vulnerable = sum(1 for w in ["honestly", "actually", "feel", "struggle", "anxious", "worried", "idk", "imo", "tbh"] if w in combined)
+            if avg_len > 40 and vulnerable > 2:
+                out["conversational_intimacy"] = "vulnerable"
+            elif avg_len < 12 and vulnerable < 1:
+                out["conversational_intimacy"] = "guarded"
+            else:
+                out["conversational_intimacy"] = "open"
+
+    # Community role: from interactions and message volume
+    interactions = discord_data.get("interactions") or []
+    total_interactions = sum(
+        int(x.get("interaction_count", 0)) for x in interactions
+        if isinstance(x, dict)
+    ) if interactions else 0
+    msg_count = len(discord_data.get("messages") or [])
+    if msg_count > 100 and total_interactions > 50:
+        out["community_role"] = "leader"
+    elif msg_count < 20:
+        out["community_role"] = "lurker"
+    else:
+        out["community_role"] = "participant"
+
+    # Engagement rhythm: pass through activity_patterns
+    activity = discord_data.get("activity_patterns") or {}
+    if isinstance(activity, dict):
+        out["engagement_rhythm"] = {
+            k: v for k, v in activity.items()
+            if k in ("peak_hours", "active_days", "message_frequency")
+        }
+
+    return out
+
+
 def build_profile(content: SocialContent) -> PsychologicalProfile:
     """Build a psychological profile from ingested social content."""
     posts = list(content.iter_posts())
@@ -365,6 +455,9 @@ def build_profile(content: SocialContent) -> PsychologicalProfile:
     visual_preference = "image_heavy" if browsing_style == "visual_browser" else ("text_heavy" if content_density_preference == "dense" else "balanced")
     link_following_likelihood = "high" if browsing_style in ("deep_diver", "doom_scroller") else ("medium" if browsing_style == "thread_reader" else "low")
 
+    # Discord-specific signals when present
+    discord_supplement = _extract_discord_signals(getattr(content, "discord_data", None))
+
     return PsychologicalProfile(
         themes=themes,
         sentiment_compound=sentiment_compound,
@@ -393,4 +486,9 @@ def build_profile(content: SocialContent) -> PsychologicalProfile:
         color_palette=color_palette,
         layout_style=layout_style,
         typography_vibe=typography_vibe,
+        tribal_affiliations=discord_supplement["tribal_affiliations"],
+        reaction_triggers=discord_supplement["reaction_triggers"],
+        conversational_intimacy=discord_supplement["conversational_intimacy"],
+        community_role=discord_supplement["community_role"],
+        engagement_rhythm=discord_supplement["engagement_rhythm"],
     )
