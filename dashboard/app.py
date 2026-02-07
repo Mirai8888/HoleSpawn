@@ -1,5 +1,5 @@
 """
-HoleSpawn dashboard: list profiles, agenda search, network reports.
+HoleSpawn dashboard: C2 command center + legacy profiles/network.
 Run: python -m dashboard.app (or flask --app dashboard.app run)
 """
 
@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(ROOT))
 
-# Load .env before Flask so API keys are set. Windows often saves .env as UTF-16.
+# Load .env before Flask
 os.environ.setdefault("FLASK_SKIP_DOTENV", "1")
 try:
     from dotenv import load_dotenv
@@ -33,7 +33,7 @@ except ImportError:
 
 from flask import Flask, jsonify, request, send_from_directory
 
-# DB path: env or default
+# Legacy DB path (profiles, network_reports)
 def _db_path() -> Path:
     p = os.getenv("HOLESPAWN_DB", "")
     if p:
@@ -42,11 +42,31 @@ def _db_path() -> Path:
 
 
 app = Flask(__name__, static_folder="static")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "c2-dashboard-dev-secret-change-in-production")
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# ----- C2 database init -----
+try:
+    from dashboard.db import init_db as c2_init_db
+    c2_init_db()
+except Exception:
+    pass
+
+# ----- Blueprints -----
+from dashboard.api import auth_bp, targets_bp, traps_bp, campaigns_bp, intel_bp, track_bp, jobs_bp
+app.register_blueprint(auth_bp)
+app.register_blueprint(targets_bp)
+app.register_blueprint(traps_bp)
+app.register_blueprint(campaigns_bp)
+app.register_blueprint(intel_bp)
+app.register_blueprint(track_bp)
+app.register_blueprint(jobs_bp)
 
 
 @contextmanager
 def _db():
-    """Context manager for DB connections. Uses sqlite3 built-in context manager."""
+    """Context manager for legacy HoleSpawn DB."""
     path = _db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.is_file():
@@ -61,6 +81,7 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
+# ----- Legacy API (profiles, network) -----
 @app.route("/api/profiles")
 def list_profiles():
     try:
@@ -87,7 +108,6 @@ def list_profiles():
 
 @app.route("/api/profiles/<run_id>/repair", methods=["POST"])
 def repair_profile_brief(run_id: str):
-    """Regenerate engagement brief from stored behavioral matrix (no raw content). Requires LLM API key."""
     try:
         with _db() as conn:
             row = conn.execute(

@@ -1,5 +1,10 @@
 (function () {
   const titles = {
+    targets: "Targets",
+    traps: "Traps",
+    campaigns: "Campaigns",
+    intel: "Intel",
+    jobs: "Jobs",
     profiles: "Profiles",
     search: "Agenda search",
     network: "Network reports",
@@ -12,10 +17,17 @@
     const btn = document.querySelector('.nav-btn[data-panel="' + name + '"]');
     if (panel) panel.classList.add("active");
     if (btn) btn.classList.add("active");
-    document.getElementById("panel-title").textContent = titles[name] || name;
+    const titleEl = document.getElementById("panel-title");
+    if (titleEl) titleEl.textContent = titles[name] || name;
+    if (name === "targets" && window.loadTargets) window.loadTargets();
+    if (name === "traps" && window.loadTraps) window.loadTraps();
+    if (name === "campaigns" && window.loadCampaigns) window.loadCampaigns();
+    if (name === "intel" && window.loadIntel) window.loadIntel();
+    if (name === "jobs" && window.loadJobs) window.loadJobs();
     if (name === "profiles") loadProfiles();
     if (name === "network") loadNetworkReports();
   }
+  window.showPanel = showPanel;
 
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.addEventListener("click", function () {

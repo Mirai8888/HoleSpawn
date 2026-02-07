@@ -129,6 +129,25 @@ DB path: `HOLESPAWN_DB` env or default `outputs/holespawn.sqlite` (relative to p
 
 ---
 
+## C2 DASHBOARD
+
+Command and control interface for operations: target management, trap generation, campaigns, and visit tracking.
+
+```bash
+# Initialize and start
+python -m dashboard init-db
+python -m dashboard serve
+
+# Start background worker (separate terminal)
+python -m dashboard worker
+```
+
+Access at: **http://localhost:5000** (login with any passphrase in dev when `DASHBOARD_PASSPHRASE` is not set).
+
+Full documentation: [docs/C2_DASHBOARD.md](docs/C2_DASHBOARD.md).
+
+---
+
 ## APPROVED USAGE
 
 - Self-analysis

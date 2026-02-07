@@ -302,3 +302,55 @@ body {
 .modal-body.markdown p {
   margin: 0.5rem 0;
 }
+
+/* C2 login */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+.login-screen.hidden {
+  display: none;
+}
+.login-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 320px;
+}
+.login-box h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  color: var(--accent);
+}
+.login-box .input {
+  width: 100%;
+  margin: 0.75rem 0;
+}
+.login-box .btn {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+.nav-hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.5rem 1rem;
+}
+.sidebar .btn-ghost {
+  margin: 1rem 1rem 0;
+  width: calc(100% - 2rem);
+}
+.actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.actions .input {
+  flex: 1;
+  max-width: 280px;
+}
