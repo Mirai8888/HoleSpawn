@@ -12,8 +12,8 @@ from typing import Any, Optional
 from holespawn.experience import ExperienceSpec
 from holespawn.profile import PsychologicalProfile
 
+from .pure_generator import generate_design_system
 from .templates import (
-    _aesthetic_defaults,
     entry_article_page,
     hub_spoke_page,
     infinite_scroll_feed,
@@ -114,64 +114,8 @@ class MultiPageSiteBuilder:
         self._write_js(output_dir)
 
     def _write_css(self, output_dir: Path) -> None:
-        """Write styles.css with spec colors and multi-page layout rules."""
-        s = self.spec
-        css = f"""/* Multi-page attention trap theme */
-:root {{
-  --color-primary: {s.color_primary};
-  --color-secondary: {s.color_secondary};
-  --color-background: {s.color_background};
-  --color-accent: {s.color_accent};
-  --font-sans: system-ui, -apple-system, sans-serif;
-}}
-* {{ box-sizing: border-box; }}
-body {{
-  margin: 0;
-  font-family: var(--font-sans);
-  background: var(--color-background);
-  color: var(--color-primary);
-  line-height: 1.6;
-  min-height: 100vh;
-}}
-.site-header {{
-  padding: 1.5rem 1rem;
-  border-bottom: 1px solid var(--color-secondary);
-}}
-.site-header h1 {{ margin: 0; font-size: 1.5rem; }}
-.tagline {{ margin: 0.25rem 0 0; font-size: 0.95rem; color: var(--color-secondary); }}
-.back {{ padding: 1rem; }}
-.back a {{ color: var(--color-secondary); text-decoration: none; }}
-.back a:hover {{ text-decoration: underline; }}
-/* Feed layout */
-.layout-feed .feed {{ max-width: 600px; margin: 0 auto; padding: 1rem; }}
-.feed-item {{ margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-secondary); }}
-.feed-item h3 {{ margin: 0 0 0.5rem 0; }}
-.feed-item a {{ color: var(--color-secondary); text-decoration: none; }}
-.feed-item a:hover {{ text-decoration: underline; }}
-.feed-item .preview {{ margin: 0.5rem 0; color: var(--color-primary); opacity: 0.9; }}
-.feed-item .hook {{ margin: 0.5rem 0 0; }}
-.load-more {{ text-align: center; padding: 2rem; }}
-.load-more button {{ padding: 0.75rem 1.5rem; background: var(--color-accent); color: var(--color-background); border: none; cursor: pointer; font-size: 1rem; }}
-/* Hub layout */
-.layout-hub .hub-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; padding: 1.5rem; max-width: 1000px; margin: 0 auto; }}
-.hub-card {{ display: block; padding: 1.25rem; background: var(--color-background); border: 1px solid var(--color-secondary); border-radius: 6px; color: var(--color-primary); text-decoration: none; }}
-.hub-card:hover {{ border-color: var(--color-accent); }}
-.hub-card h3 {{ margin: 0 0 0.5rem 0; }}
-.hub-card p {{ margin: 0; font-size: 0.9rem; color: var(--color-secondary); }}
-/* Article / topic */
-.layout-article article, .layout-topic article {{ max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem; }}
-.layout-wiki article {{ max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }}
-article h1 {{ margin: 0 0 1rem 0; font-size: 1.75rem; }}
-.content {{ margin-top: 0.5rem; }}
-.content p {{ margin: 0.75rem 0; }}
-.content a {{ color: var(--color-secondary); text-decoration: none; border-bottom: 1px dotted var(--color-secondary); }}
-.content a:hover {{ border-bottom-style: solid; }}
-.infobox {{ float: right; width: 260px; margin: 0 0 1rem 1rem; padding: 1rem; background: var(--color-background); border: 1px solid var(--color-secondary); }}
-.see-also, .related {{ margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-secondary); }}
-.see-also ul, .related ul {{ list-style: none; padding: 0; }}
-.see-also li, .related li {{ margin: 0.5rem 0; }}
-.see-also a, .related a {{ color: var(--color-secondary); text-decoration: none; }}
-"""
+        """Write styles.css via AI design system (psychological capture from profile + spec)."""
+        css = generate_design_system(self.profile, self.spec)
         (output_dir / "styles.css").write_text(css, encoding="utf-8")
 
     def _write_js(self, output_dir: Path) -> None:

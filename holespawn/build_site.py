@@ -423,7 +423,7 @@ def main() -> None:
         except Exception as e:
             _log(f"Content generation failed: {e}")
             sys.exit(1)
-        build_site(spec, sections_content, site_dir)
+        build_site(spec, sections_content, site_dir, profile=profile)
         _log(f"Site written to {site_dir}")
     else:
         # Pure generation: LLM designs structure, CSS, and content from full profile

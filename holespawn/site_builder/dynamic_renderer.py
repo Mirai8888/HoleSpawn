@@ -12,7 +12,7 @@ from typing import Any, Optional
 from holespawn.experience import ExperienceSpec
 from holespawn.profile import PsychologicalProfile
 
-from .aesthetic import generate_css
+from .pure_generator import generate_design_system
 
 
 def _escape(s: str) -> str:
@@ -154,8 +154,8 @@ def render_pages(
         filename = f"{key}.html" if not key.endswith(".html") else key
         (output_dir / filename).write_text(page_html, encoding="utf-8")
 
-    # Shared CSS (profile-matched aesthetic)
-    css = generate_css(profile, spec)
+    # Shared CSS (AI design system — psychological capture from profile + spec)
+    css = generate_design_system(profile, spec)
     (output_dir / "styles.css").write_text(css, encoding="utf-8")
 
     # Shared JS (load more for feed)

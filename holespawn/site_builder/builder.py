@@ -1,13 +1,15 @@
 """
 Render a full static website from ExperienceSpec + section content.
 Output: index.html, styles.css, app.js in the target directory (deployable).
+Uses AI-generated design system when profile is provided.
 """
 
 import html
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from holespawn.experience import ExperienceSpec, SectionSpec
+from holespawn.profile import PsychologicalProfile
 
 try:
     import bleach
@@ -23,6 +25,55 @@ ALLOWED_ATTRS = {"a": ["href", "title"], "code": ["class"]}
 
 def _escape(s: str) -> str:
     return html.escape(s, quote=True)
+
+
+def _fallback_css(spec: ExperienceSpec) -> str:
+    """Spec-based CSS when no profile (e.g. tests). Keeps single-page site renderable."""
+    return f"""/* Fallback theme from experience spec (no profile) */
+:root {{
+  --color-primary: {spec.color_primary};
+  --color-secondary: {spec.color_secondary};
+  --color-background: {spec.color_background};
+  --color-accent: {spec.color_accent};
+  --font-sans: system-ui, -apple-system, sans-serif;
+}}
+* {{ box-sizing: border-box; }}
+body {{
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}}
+.site-header {{ padding: 2rem 1.5rem; text-align: center; border-bottom: 1px solid var(--color-secondary); }}
+.site-header h1 {{ margin: 0; font-size: 1.75rem; font-weight: 600; }}
+.tagline {{ margin: 0.5rem 0 0; font-size: 1rem; color: var(--color-secondary); }}
+.site-main {{ max-width: 42rem; margin: 0 auto; padding: 2rem 1.5rem; }}
+.section {{ margin-bottom: 3rem; }}
+.section h2 {{ font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--color-accent); }}
+.section-body {{ margin-top: 0.5rem; }}
+.section-body p {{ margin: 0.75rem 0; }}
+.section-puzzle .puzzle-question {{ margin-bottom: 1rem; }}
+.section-puzzle .puzzle-input {{
+  display: block; width: 100%; max-width: 20rem; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;
+  font-size: 1rem; border: 1px solid var(--color-secondary); border-radius: 4px;
+  background: var(--color-background); color: var(--color-primary);
+}}
+.section-puzzle .puzzle-check {{
+  padding: 0.5rem 1rem; font-size: 0.9rem; background: var(--color-accent);
+  color: var(--color-background); border: none; border-radius: 4px; cursor: pointer;
+}}
+.section-puzzle .puzzle-check:hover {{ opacity: 0.9; }}
+.section-puzzle .puzzle-hint {{ margin-top: 1rem; font-size: 0.9rem; color: var(--color-secondary); }}
+.section-puzzle .puzzle-feedback {{ margin-top: 0.75rem; font-weight: 500; }}
+.section-puzzle .puzzle-feedback.correct {{ color: var(--color-accent); }}
+.section-puzzle .puzzle-feedback.wrong {{ color: var(--color-accent); }}
+.site-footer {{
+  padding: 2rem 1.5rem; text-align: center; font-size: 0.8rem;
+  color: var(--color-secondary); border-top: 1px solid var(--color-secondary);
+}}
+"""
 
 
 def _sanitize_html(content: str) -> str:
@@ -78,11 +129,13 @@ def build_site(
     spec: ExperienceSpec,
     sections_content: list[dict],
     output_dir: str | Path,
+    profile: Optional[PsychologicalProfile] = None,
 ) -> None:
     """
     Generate a full static website into output_dir.
     spec: experience spec (aesthetic, colors, sections).
     sections_content: list of section dicts from get_site_content (id, title, body/question/hint/answer, type).
+    profile: optional. When provided, CSS is generated via AI design system (psychological capture). Otherwise uses spec-based fallback.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -116,107 +169,11 @@ def build_site(
 </body>
 </html>"""
 
-    css = f"""/* Personalized theme from experience spec */
-:root {{
-  --color-primary: {spec.color_primary};
-  --color-secondary: {spec.color_secondary};
-  --color-background: {spec.color_background};
-  --color-accent: {spec.color_accent};
-  --font-sans: system-ui, -apple-system, sans-serif;
-}}
-
-* {{ box-sizing: border-box; }}
-body {{
-  margin: 0;
-  font-family: var(--font-sans);
-  background: var(--color-background);
-  color: var(--color-primary);
-  line-height: 1.6;
-  min-height: 100vh;
-}}
-
-.site-header {{
-  padding: 2rem 1.5rem;
-  text-align: center;
-  border-bottom: 1px solid var(--color-secondary);
-}}
-.site-header h1 {{
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 600;
-}}
-.tagline {{
-  margin: 0.5rem 0 0;
-  font-size: 1rem;
-  color: var(--color-secondary);
-}}
-
-.site-main {{
-  max-width: 42rem;
-  margin: 0 auto;
-  padding: 2rem 1.5rem;
-}}
-
-.section {{
-  margin-bottom: 3rem;
-}}
-.section h2 {{
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: var(--color-accent);
-}}
-
-.section-body {{ margin-top: 0.5rem; }}
-.section-body p {{ margin: 0.75rem 0; }}
-
-.section-puzzle .puzzle-question {{
-  margin-bottom: 1rem;
-}}
-.section-puzzle .puzzle-input {{
-  display: block;
-  width: 100%;
-  max-width: 20rem;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  border: 1px solid var(--color-secondary);
-  border-radius: 4px;
-  background: var(--color-background);
-  color: var(--color-primary);
-}}
-.section-puzzle .puzzle-check {{
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  background: var(--color-accent);
-  color: var(--color-background);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}}
-.section-puzzle .puzzle-check:hover {{
-  opacity: 0.9;
-}}
-.section-puzzle .puzzle-hint {{
-  margin-top: 1rem;
-  font-size: 0.9rem;
-  color: var(--color-secondary);
-}}
-.section-puzzle .puzzle-feedback {{
-  margin-top: 0.75rem;
-  font-weight: 500;
-}}
-.section-puzzle .puzzle-feedback.correct {{ color: var(--color-accent); }}
-.section-puzzle .puzzle-feedback.wrong {{ color: var(--color-accent); }}
-
-.site-footer {{
-  padding: 2rem 1.5rem;
-  text-align: center;
-  font-size: 0.8rem;
-  color: var(--color-secondary);
-  border-top: 1px solid var(--color-secondary);
-}}
-"""
+    if profile is not None:
+        from holespawn.site_builder.pure_generator import generate_design_system
+        css = generate_design_system(profile, spec)
+    else:
+        css = _fallback_css(spec)
 
     js = """document.querySelectorAll('.section-puzzle').forEach(function(section) {
   var input = section.querySelector('.puzzle-input');

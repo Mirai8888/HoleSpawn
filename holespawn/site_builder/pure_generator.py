@@ -38,6 +38,18 @@ def _profile_for_prompt(profile: PsychologicalProfile) -> dict[str, Any]:
     }
 
 
+def _profile_for_design_prompt(profile: PsychologicalProfile) -> dict[str, Any]:
+    """Serialize profile for design system generator (all design-relevant fields)."""
+    p = _profile_for_prompt(profile)
+    p["color_palette"] = getattr(profile, "color_palette", "neutral")
+    p["layout_style"] = getattr(profile, "layout_style", "balanced")
+    p["typography_vibe"] = getattr(profile, "typography_vibe", "clean sans")
+    p["link_following_likelihood"] = getattr(profile, "link_following_likelihood", "medium")
+    p["avg_sentence_length"] = getattr(profile, "avg_sentence_length", 15.0)
+    p["avg_word_length"] = getattr(profile, "avg_word_length", 4.5)
+    return p
+
+
 def _extract_json(text: str) -> dict:
     text = text.strip()
     if "```" in text:
@@ -150,37 +162,126 @@ Design a website structure that would trap THIS person's attention. 10-20 pages.
     return {"pages": pages}
 
 
-CSS_SYSTEM = """Generate a complete CSS stylesheet for a website.
+DESIGN_SYSTEM_SYSTEM = """You are generating a complete CSS design system that will psychologically capture one specific person. The goal is not to "look nice" but to create an aesthetic that feels personally resonant, guides their attention to engagement hooks, and makes exploration feel more natural than leaving. Design is an active component of the trap.
 
-You will receive profile data about the person who will use this site: how they write, their vocabulary, communication style, interests, cultural context.
+FRAMING: Generate a design system that will psychologically capture this person. The aesthetic should feel personally resonant, guide their attention to engagement hooks, and make exploration feel more natural than leaving.
 
-TASK: Generate CSS that looks like websites THEY actually visit. Don't categorize—generate from their actual data.
+AESTHETIC MANIPULATION:
+- Use colors and typography to create specific emotional states (calm vs anxious, curious vs satisfied) based on their profile.
+- Design information hierarchy so attention is drawn to content that matches their obsessions, pet_peeves, and susceptibilities.
+- Create visual rhythm that matches their browsing patterns (doom_scroller = relentless flow; deep_diver = paced, layered; scanner = clear entry points) so they stay in flow state.
+- Use whitespace and density to overwhelm or soothe as appropriate (content_density_preference, intensity, sentiment).
 
-Think about:
-- What sites match their vocabulary and interests?
-- What aesthetic fits their communication style?
-- What colors, fonts, layouts would feel natural to them?
+FRICTION DESIGN:
+- Navigation should feel natural for exploration but unclear for exit.
+- Make ".back a" and any "home" or exit links LESS visually prominent than links that go deeper (e.g. smaller, lower contrast, muted). Use visual weight to pull toward content and "See also" / "Related" / content links, not toward leaving.
+- Style .back a so it is de-emphasized; style .content a, .feed-item a, .hub-card, .see-also a, .related a so they are more prominent and inviting.
 
-Guidelines (adapt, don't copy):
-- Casual/playful → bright, modern, fun fonts
-- Formal/academic → clean, serif, readable
-- Technical → monospace, functional
-- Lots of emoji → colorful, expressive
-- No emoji → muted, professional
-- Rationalist/academic → LessWrong-style (clean, lots of text)
-- Crypto/tech → dark mode, terminal aesthetic
-- Startup → modern, clean, blue
-- Gaming → dark, vibrant accents
+UNCANNY PERSONALIZATION:
+- When the profile has strong aesthetic signals (color_palette, layout_style, typography_vibe), lean into them so it feels "made for me."
+- Use visual callbacks to themes in their world (cultural_references, specific_interests) without being obvious.
+- Create a feeling of "this understands me" through typography, color, and rhythm choices.
 
-Include:
-- :root variables (--bg, --text, --accent, --link, --font or similar)
-- body (background, color, font-family, line-height, max-width, margin, padding)
-- a / links (color, text-decoration, border-bottom, hover)
-- article, .content (margins, typography)
-- .site-header, .breadcrumbs, nav
-- Optional: .feed-item, .hub-card if relevant
+QUALITY CONSTRAINTS (non-negotiable):
+- Contrast: Text on background must meet WCAG AA (4.5:1 for normal text, 3:1 for large). Use hex colors that satisfy this.
+- Typography: Use a clear type scale (e.g. 1rem base, 1.25–1.5 for h1, 0.9–1 for small). Prefer web-safe or common web font stacks (system-ui, Georgia, "Segoe UI", "Helvetica Neue", "Courier New", etc.).
+- Visual hierarchy: Headings and content links must stand out; back/exit must be visually secondary.
+- Accessibility: Ensure focus states for interactive elements (e.g. outline or visible focus ring for .hub-card:focus, .load-more button:focus).
 
-Return ONLY valid CSS. No comments, no explanations. Start with :root, then body, then elements."""
+EXAMPLES OF BEAUTIFUL, DISTINCT SITES (vary your output; do not copy):
+- Editorial: Clear hierarchy, generous whitespace, serif for body, strong headings (e.g. The Verge, NYT).
+- Minimal brutalist: High contrast, strict grid, limited palette, bold type (e.g. Bloomberg, some portfolios).
+- Warm and immersive: Soft contrast, flowing layout, rounded corners, inviting links (e.g. Medium, Substack).
+- Terminal/tech: Dark bg, monospace, accent color for links, tight spacing (e.g. dev docs, CLI aesthetics).
+- Playful/chaotic: Bright accents, varied weights, asymmetric layout, high energy (e.g. meme-adjacent, youth brands).
+
+REQUIRED CSS COVERAGE (you must include styles for all of these; the site HTML uses these class names):
+- :root with variables (e.g. --color-bg, --color-text, --color-accent, --color-secondary, --font, or similar).
+- * { box-sizing: border-box; }
+- body (font-family, background, color, line-height, min-height: 100vh).
+- .site-header, .site-header h1, .tagline
+- .site-main (max-width, margin, padding as appropriate to layout_style)
+- .site-footer
+- .section, .section h2, .section-narrative, .section-body
+- .section-puzzle, .puzzle-question, .puzzle-input, .puzzle-check, .puzzle-hint, .puzzle-feedback
+- .back, .back a (de-emphasized: smaller and/or lower contrast than content links)
+- .layout-feed .feed, .feed-item, .feed-item h3, .feed-item a, .feed-item .preview, .feed-item .hook
+- .load-more, .load-more button
+- .layout-hub .hub-grid, .hub-card, .hub-card h3, .hub-card p
+- .layout-article article, .layout-topic article, .layout-wiki article
+- article h1, .content, .content p, .content a
+- .see-also, .related, .see-also h3, .related h3, .see-also ul, .related ul, .see-also a, .related a
+- .infobox (optional; for wiki-style pages)
+
+LAYOUT SYSTEM: Derive from layout_style and browsing_style. "Scattered" or "chaotic" → asymmetric grid, varied gaps; "structured" or "balanced" → clear grid, consistent spacing; "flowing" → single column, generous line-height and margins. Express via grid-template-columns, gap, max-width, padding.
+
+Return ONLY valid CSS. No markdown, no comments, no explanation. Start with :root, then body, then elements. Use the exact class names above."""
+
+
+def generate_design_system(
+    profile: PsychologicalProfile,
+    spec: Any = None,
+    *,
+    call_llm_fn: Callable[..., str] = call_llm,
+    tracker: Optional[CostTracker] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    calls_per_minute: int = 20,
+) -> str:
+    """
+    Canonical design system generator. Returns full CSS from profile (and optional spec).
+    All builders should use this instead of preset lookups. Design is tuned for psychological
+    capture: resonant aesthetic, attention to hooks, exploration favored over exit.
+    """
+    p = _profile_for_design_prompt(profile)
+    user_parts = [
+        "TARGET PERSON — generate a design system that will psychologically capture them.",
+        "",
+        "VOICE & STYLE:",
+        f"- Sample phrases: {json.dumps(p['sample_phrases'][:12])}",
+        f"- Vocabulary: {', '.join(p['vocabulary_sample'][:25]) if p['vocabulary_sample'] else 'N/A'}",
+        f"- Communication style: {p['communication_style']}",
+        f"- Sentence structure: {p['sentence_structure']}, Emoji: {p['emoji_usage']}",
+        "",
+        "DESIGN SIGNALS (use these to drive layout, color, type):",
+        f"- Color palette preference: {p['color_palette']}",
+        f"- Layout style: {p['layout_style']}",
+        f"- Typography vibe: {p['typography_vibe']}",
+        f"- Browsing style: {p['browsing_style']}",
+        f"- Content density: {p['content_density_preference']}, Visual: {p['visual_preference']}",
+        f"- Link-following likelihood: {p['link_following_likelihood']}",
+        f"- Reading patterns: avg sentence length {p['avg_sentence_length']:.1f}, avg word length {p['avg_word_length']:.1f}",
+        "",
+        "HOOKS (design hierarchy to pull attention here):",
+        f"- Obsessions: {', '.join(p['obsessions'][:8]) if p['obsessions'] else 'N/A'}",
+        f"- Pet peeves / anxieties: {', '.join(p['pet_peeves'][:8]) if p['pet_peeves'] else 'N/A'}",
+        f"- Interests: {', '.join(p['specific_interests'][:10]) if p['specific_interests'] else 'N/A'}",
+        "",
+        "CONTEXT:",
+        f"- Cultural references: {', '.join(p['cultural_references'][:8]) if p['cultural_references'] else 'N/A'}",
+        f"- Sentiment: {p['sentiment_compound']:.2f}, Intensity: {p['intensity']:.2f}",
+    ]
+    if spec is not None:
+        user_parts.extend([
+            "",
+            "EXPERIENCE SPEC (optional overrides):",
+            f"- Title/tone from spec; colors if set: primary {getattr(spec, 'color_primary', '')} secondary {getattr(spec, 'color_secondary', '')} accent {getattr(spec, 'color_accent', '')} background {getattr(spec, 'color_background', '')}",
+        ])
+    user_parts.append("")
+    user_parts.append("Generate complete CSS. De-emphasize .back a; emphasize content and deeper links. Return only valid CSS.")
+    user = "\n".join(user_parts)
+
+    raw = call_llm_fn(
+        DESIGN_SYSTEM_SYSTEM,
+        user,
+        provider_override=provider,
+        model_override=model,
+        max_tokens=4096,
+        operation="design_system",
+        tracker=tracker,
+        calls_per_minute=calls_per_minute,
+    )
+    return raw.strip()
 
 
 def generate_css(
@@ -192,30 +293,16 @@ def generate_css(
     model: Optional[str] = None,
     calls_per_minute: int = 20,
 ) -> str:
-    """LLM generates full CSS from profile."""
-    p = _profile_for_prompt(profile)
-    user = f"""Person who will use this site:
-
-WRITES LIKE: {json.dumps(p['sample_phrases'][:10])}
-USES THESE WORDS: {', '.join(p['vocabulary_sample'][:30]) if p['vocabulary_sample'] else 'N/A'}
-COMMUNICATION STYLE: {p['communication_style']}
-EMOJI: {p['emoji_usage']}
-INTERESTS: {', '.join(p['specific_interests'][:10]) if p['specific_interests'] else 'N/A'}
-CULTURAL CONTEXT: {', '.join(p['cultural_references']) if p['cultural_references'] else 'N/A'}
-
-Generate CSS that looks like sites THEY visit. Return only valid CSS."""
-
-    raw = call_llm_fn(
-        CSS_SYSTEM,
-        user,
-        provider_override=provider,
-        model_override=model,
-        max_tokens=2048,
-        operation="pure_css",
+    """LLM generates full CSS from profile. Delegates to generate_design_system (canonical)."""
+    return generate_design_system(
+        profile,
+        spec=None,
+        call_llm_fn=call_llm_fn,
         tracker=tracker,
+        provider=provider,
+        model=model,
         calls_per_minute=calls_per_minute,
     )
-    return raw.strip()
 
 
 CONTENT_SYSTEM = """Generate the body content for one webpage. You will receive:
@@ -403,9 +490,10 @@ def generate_site_from_profile(
     pages = structure.get("pages", [])
     logger.info("Generated %d pages", len(pages))
 
-    logger.info("Generating CSS from profile...")
-    css = generate_css(
+    logger.info("Generating design system (CSS) from profile...")
+    css = generate_design_system(
         profile,
+        spec=None,
         call_llm_fn=call_llm_fn,
         tracker=tracker,
         provider=provider,
