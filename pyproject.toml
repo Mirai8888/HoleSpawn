@@ -21,6 +21,7 @@ dependencies = [
     "pyyaml>=6.0",
     "jsonschema>=4.0.0",
     "networkx>=3.0",
+    "python-louvain>=0.16",
     "numpy>=1.20.0",
     "scipy>=1.7.0",
     "flask>=3.0.0",

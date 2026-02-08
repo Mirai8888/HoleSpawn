@@ -1,32 +1,56 @@
 """
-CLI for network analysis. Data from file-based dir or paid API (Apify).
-Usage:
-  python -m holespawn.network profiles_dir/ -o report.json
-  python -m holespawn.network profiles_dir/ --edges edges.csv -o report.json
-  python -m holespawn.network --apify @username --max-following 50 -o report.json  (requires APIFY_API_TOKEN)
+CLI for network analysis. Two modes:
+  1) Graph profiling: python -m holespawn.network @username -o output_dir  (fetch graph, profile key nodes, report + viz)
+  2) File-based / Apify profiles: python -m holespawn.network profiles_dir/ -o report.json  or  --apify @user -o report.json
 """
 
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
+
+# Load .env so APIFY_API_TOKEN and LLM keys are available (same as build_site)
+ROOT = Path(__file__).resolve().parent.parent.parent
+try:
+    from dotenv import load_dotenv
+
+    _env_path = ROOT / ".env"
+    if _env_path.exists():
+        try:
+            with open(_env_path, encoding="utf-8") as f:
+                load_dotenv(stream=f)
+        except UnicodeDecodeError:
+            with open(_env_path, encoding="utf-16") as f:
+                load_dotenv(stream=f)
+    else:
+        load_dotenv(_env_path)
+except ImportError:
+    pass
 
 from .analyzer import NetworkAnalyzer, load_edges_file, load_profiles_from_dir
 from .apify_network import fetch_profiles_via_apify
 from .brief import get_network_engagement_brief
+from .pipeline import run_network_graph_pipeline
+
+
+def _looks_like_username(s: str) -> bool:
+    if not s or len(s) > 100:
+        return False
+    s = s.strip().lstrip("@")
+    return bool(s) and not Path(s).exists() and "/" not in s and "\\" not in s and "." not in s
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Analyze network from file-based profiles or paid API (Apify)."
+        description="Network analysis: graph profiling (@username) or file-based profiles (dir / --apify)."
     )
     parser.add_argument(
-        "profiles_dir",
-        type=Path,
+        "positional",
         nargs="?",
         default=None,
-        help="Directory with behavioral_matrix.json or profile.json per account.",
+        help="Username (e.g. @user) for graph pipeline, or directory for profile-based analysis.",
     )
     parser.add_argument(
         "--apify",
@@ -52,32 +76,107 @@ def main() -> None:
         "--output",
         type=Path,
         default=None,
-        help="Write report JSON here. Default: stdout.",
+        help="Output: directory for graph pipeline, or report JSON path for profile-based.",
+    )
+    parser.add_argument(
+        "--inner-circle-size",
+        type=int,
+        default=150,
+        metavar="N",
+        help="Graph pipeline: how many top connections to crawl for inter-edges (default 150).",
+    )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=1,
+        help="Graph pipeline: hops from target to explore (default 1; reserved for future).",
+    )
+    parser.add_argument(
+        "--top-nodes",
+        type=int,
+        default=15,
+        help="Graph pipeline: how many key nodes to fully profile (default 15).",
+    )
+    parser.add_argument(
+        "--no-viz",
+        action="store_true",
+        help="Graph pipeline: skip generating network_graph.html.",
+    )
+    parser.add_argument(
+        "--communities-only",
+        action="store_true",
+        help="Graph pipeline: only detect/describe communities, skip individual node profiling.",
+    )
+    parser.add_argument(
+        "--budget",
+        type=float,
+        default=None,
+        metavar="DOLLARS",
+        help="Graph pipeline: max spend in dollars (e.g. 5.00). Uses COST_MAX_THRESHOLD if not set.",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Graph pipeline: resume from existing network_raw_data.json if present.",
+    )
+    parser.add_argument(
+        "--consent-acknowledged",
+        action="store_true",
+        help="Graph pipeline: skip cost estimate / Proceed? prompt (for scripted use).",
     )
     parser.add_argument(
         "--similarity-threshold",
         type=float,
         default=0.12,
-        help="Min Jaccard similarity to link profiles when no edges file (default 0.12).",
+        help="Profile-based: min Jaccard similarity when no edges file (default 0.12).",
     )
     parser.add_argument(
         "--no-brief",
         action="store_true",
-        help="Skip generating network_engagement_brief.md (requires API key when -o is set).",
+        help="Profile-based: skip network_engagement_brief.md.",
     )
     parser.add_argument(
         "--db",
         type=Path,
         default=None,
-        help="Store network report in SQLite (path or dir; e.g. outputs/holespawn.sqlite).",
+        help="Store network report in SQLite (path or dir).",
     )
     parser.add_argument(
         "--yes",
         action="store_true",
-        help="Skip confirmation for large --apify runs (--max-following > 20).",
+        help="Skip confirmation for large --apify runs.",
     )
     args = parser.parse_args()
 
+    # Graph profiling mode: positional is username and -o is directory (not a .json file)
+    if (
+        args.positional
+        and _looks_like_username(args.positional)
+        and args.output
+        and Path(args.output).suffix.lower() != ".json"
+    ):
+        username = args.positional.strip().lstrip("@")
+        out_dir = Path(args.output)
+        try:
+            run_network_graph_pipeline(
+                username,
+                out_dir,
+                inner_circle_size=args.inner_circle_size,
+                top_nodes=0 if args.communities_only else args.top_nodes,
+                communities_only=args.communities_only,
+                no_viz=args.no_viz,
+                budget=args.budget,
+                resume=args.resume,
+                consent_acknowledged=args.consent_acknowledged,
+                log=lambda msg: sys.stderr.write(msg + "\n"),
+            )
+            sys.stderr.write(f"Network profiling complete. Output: {out_dir}\n")
+            return
+        except Exception as e:
+            sys.stderr.write(f"[holespawn] error: graph pipeline failed: {e}\n")
+            sys.exit(1)
+
+    # Profile-based mode (existing behavior)
     if args.apify:
         username = (args.apify or "").strip().lstrip("@")
         if not username:
@@ -111,8 +210,8 @@ def main() -> None:
                 "[holespawn] error: no profiles from Apify (check APIFY_API_TOKEN and --apify username)\n"
             )
             sys.exit(1)
-    elif args.profiles_dir and Path(args.profiles_dir).is_dir():
-        profiles_dir = Path(args.profiles_dir)
+    elif args.positional and Path(args.positional).is_dir():
+        profiles_dir = Path(args.positional)
         profiles = load_profiles_from_dir(profiles_dir)
         if not profiles:
             sys.stderr.write(
@@ -120,7 +219,9 @@ def main() -> None:
             )
             sys.exit(1)
     else:
-        sys.stderr.write("[holespawn] error: provide profiles_dir or --apify USERNAME\n")
+        sys.stderr.write(
+            "[holespawn] error: provide username (e.g. @user) with -o <dir> for graph pipeline, or profiles_dir / --apify USERNAME for profile-based\n"
+        )
         sys.exit(1)
 
     edges = None

@@ -313,6 +313,52 @@ Examples:
         default=None,
         help="After run: store profile in SQLite (path or dir; default outputs/holespawn.sqlite).",
     )
+    parser.add_argument(
+        "--network",
+        action="store_true",
+        help="Run network graph profiling (fetch graph + inter-connection crawl, profile key nodes, write network_raw_data.json, network_analysis.json, network_report.md, network_graph.html). Requires --twitter-username and APIFY_API_TOKEN.",
+    )
+    parser.add_argument(
+        "--inner-circle-size",
+        type=int,
+        default=150,
+        metavar="N",
+        help="When using --network: how many top connections to crawl for inter-edges (default 150).",
+    )
+    parser.add_argument(
+        "--top-nodes",
+        type=int,
+        default=15,
+        metavar="N",
+        help="When using --network: how many key nodes to profile (default 15).",
+    )
+    parser.add_argument(
+        "--no-viz",
+        action="store_true",
+        help="When using --network: skip generating network_graph.html.",
+    )
+    parser.add_argument(
+        "--communities-only",
+        action="store_true",
+        help="When using --network: only detect communities, skip individual node profiling.",
+    )
+    parser.add_argument(
+        "--budget",
+        type=float,
+        default=None,
+        metavar="DOLLARS",
+        help="Max spend in dollars (e.g. 5.00). Applies to main pipeline and, when --network, to network profiling.",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="When using --network: resume from existing network_raw_data.json if present.",
+    )
+    parser.add_argument(
+        "--consent-acknowledged",
+        action="store_true",
+        help="When using --network: skip cost estimate / Proceed? prompt (for scripted use).",
+    )
     return parser
 
 
@@ -453,6 +499,8 @@ def main() -> None:
 
     warn = _cost_env("COST_WARN_THRESHOLD", float(cfg_costs.get("warn_threshold", 1.0)))
     max_cost = _cost_env("COST_MAX_THRESHOLD", float(cfg_costs.get("max_cost", 5.0)))
+    if getattr(args, "budget", None) is not None:
+        max_cost = float(args.budget)
     rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))
     tracker = CostTracker(model=model, warn_threshold=warn, max_cost=max_cost)
 
@@ -577,6 +625,32 @@ def main() -> None:
             _log("Skipping engagement brief (no API key).")
         except Exception as e:
             _log(f"Engagement brief failed: {e}")
+
+    # Network graph profiling (when --network and Twitter username)
+    if getattr(args, "network", False) and args.twitter_username:
+        try:
+            from holespawn.network.pipeline import run_network_graph_pipeline
+
+            _log("Running network graph profiling...")
+            run_network_graph_pipeline(
+                username,
+                out_dir,
+                inner_circle_size=getattr(args, "inner_circle_size", 150),
+                top_nodes=getattr(args, "top_nodes", 15),
+                communities_only=getattr(args, "communities_only", False),
+                no_viz=getattr(args, "no_viz", False),
+                budget=getattr(args, "budget", None),
+                resume=getattr(args, "resume", False),
+                consent_acknowledged=getattr(args, "consent_acknowledged", False),
+                tracker=tracker,
+                provider=args.provider,
+                calls_per_minute=rate,
+                log=_log,
+            )
+        except ValueError as e:
+            _log(f"Network profiling skipped: {e}")
+        except Exception as e:
+            _log(f"Network profiling failed: {e}")
 
     # Store in DB if requested
     if getattr(args, "db", None):

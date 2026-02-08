@@ -34,18 +34,28 @@ def _get_spacy():
     return _nlp_spacy
 
 
-# Optional: NLTK for lexical
+# Optional: NLTK for lexical (ensure punkt/punkt_tab so sent_tokenize works)
+def _safe_sent_tokenize(text: str) -> list[str]:
+    try:
+        from nltk.tokenize import sent_tokenize as _st
+        return _st(text)
+    except Exception:
+        return [s.strip() for s in re.split(r"[.!?]+", text) if s.strip()]
+
+
 try:
     import nltk
-    from nltk.tokenize import sent_tokenize, word_tokenize
-
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        nltk.download("punkt", quiet=True)
+    from nltk.tokenize import word_tokenize
+    for res in ("punkt_tab", "punkt"):
+        try:
+            nltk.download(res, quiet=True)
+            break
+        except Exception:
+            pass
+    sent_tokenize = _safe_sent_tokenize
 except ImportError:
     word_tokenize = None
-    sent_tokenize = None
+    sent_tokenize = lambda t: [s.strip() for s in re.split(r"[.!?]+", t) if s.strip()]
 
 # Optional: sklearn for clustering / patterns
 try:
@@ -158,7 +168,10 @@ class DiscordNLPAnalyzer:
 
         all_text = " ".join(contents)
         tokens = _tokenize_simple(all_text)
-        sentences = sent_tokenize(all_text) if sent_tokenize else _sent_tokenize_simple(all_text)
+        try:
+            sentences = sent_tokenize(all_text) if sent_tokenize else _sent_tokenize_simple(all_text)
+        except LookupError:
+            sentences = _sent_tokenize_simple(all_text)
         if not sentences:
             sentences = [all_text] if all_text else []
 

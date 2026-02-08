@@ -29,8 +29,9 @@ tqdm>=4.66.0
 pyyaml>=6.0
 jsonschema>=4.0.0
 
-# Network analysis (file-based only)
+# Network analysis (graph profiling: Louvain communities)
 networkx>=3.0
+python-louvain>=0.16
 numpy>=1.20.0
 scipy>=1.7.0
 
