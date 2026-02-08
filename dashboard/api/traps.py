@@ -35,6 +35,18 @@ def _serialize_trap(t):
     }
 
 
+def _safe_limit_offset():
+    try:
+        limit = int(request.args.get("limit") or 100)
+    except (TypeError, ValueError):
+        limit = 100
+    try:
+        offset = int(request.args.get("offset") or 0)
+    except (TypeError, ValueError):
+        offset = 0
+    return max(1, min(limit, 500)), max(0, offset)
+
+
 @traps_bp.route("", methods=["GET"])
 @login_required
 def list_traps():
@@ -43,8 +55,7 @@ def list_traps():
     is_active = request.args.get("is_active")
     if is_active is not None:
         is_active = is_active.lower() in ("1", "true", "yes")
-    limit = int(request.args.get("limit") or 100)
-    offset = int(request.args.get("offset") or 0)
+    limit, offset = _safe_limit_offset()
     with get_db() as db:
         items = ops.list_traps(db, target_id=target_id, campaign_id=campaign_id, is_active=is_active, limit=limit, offset=offset)
         return jsonify([_serialize_trap(t) for t in items])
@@ -125,7 +136,7 @@ def deploy_trap(trap_id):
 @traps_bp.route("/<int:trap_id>/visits", methods=["GET"])
 @login_required
 def get_visits(trap_id):
-    limit = int(request.args.get("limit") or 100)
+    limit, _ = _safe_limit_offset()
     with get_db() as db:
         t = ops.get_trap(db, trap_id)
         if not t:

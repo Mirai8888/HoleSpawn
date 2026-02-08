@@ -54,7 +54,11 @@ def _serialize_campaign(c):
 @login_required
 def list_campaigns():
     status = request.args.get("status")
-    limit = int(request.args.get("limit") or 50)
+    try:
+        limit = int(request.args.get("limit") or 50)
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(limit, 500))
     with get_db() as db:
         items = ops.list_campaigns(db, status=status, limit=limit)
         return jsonify([_serialize_campaign(c) for c in items])

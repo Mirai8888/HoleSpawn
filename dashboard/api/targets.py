@@ -32,14 +32,25 @@ def _serialize_target(t):
     }
 
 
+def _safe_limit_offset():
+    try:
+        limit = int(request.args.get("limit") or 100)
+    except (TypeError, ValueError):
+        limit = 100
+    try:
+        offset = int(request.args.get("offset") or 0)
+    except (TypeError, ValueError):
+        offset = 0
+    return max(1, min(limit, 500)), max(0, offset)
+
+
 @targets_bp.route("", methods=["GET"])
 @login_required
 def list_targets():
     status = request.args.get("status")
     platform = request.args.get("platform")
     tags = request.args.get("tags")
-    limit = int(request.args.get("limit") or 100)
-    offset = int(request.args.get("offset") or 0)
+    limit, offset = _safe_limit_offset()
     with get_db() as db:
         items = ops.list_targets(db, status=status, platform=platform, tags_contains=tags, limit=limit, offset=offset)
         return jsonify([_serialize_target(t) for t in items])
@@ -52,6 +63,10 @@ def create_target():
     identifier = (data.get("identifier") or "").strip()
     if not identifier:
         return jsonify({"error": "identifier required"}), 400
+    try:
+        priority = int(data.get("priority") or 0)
+    except (TypeError, ValueError):
+        priority = 0
     with get_db() as db:
         if ops.get_target_by_identifier(db, identifier):
             return jsonify({"error": "Target already exists"}), 409
@@ -59,7 +74,7 @@ def create_target():
             db,
             identifier=identifier,
             platform=data.get("platform"),
-            priority=int(data.get("priority") or 0),
+            priority=priority,
             tags=data.get("tags"),
             notes=data.get("notes"),
         )

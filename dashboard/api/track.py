@@ -17,14 +17,23 @@ def _get_monitor_with_emit():
     return get_monitor()
 
 
+def _safe_int(val, default=None):
+    """Coerce to int; return default on failure."""
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
 @track_bp.route("/start", methods=["POST"])
 def track_start():
     """Record visit start. Called by tracker.js."""
     data = request.get_json() or {}
-    trap_id = data.get("trap_id")
+    trap_id = _safe_int(data.get("trap_id"))
     if trap_id is None:
         return jsonify({"error": "trap_id required"}), 400
-    trap_id = int(trap_id)
     with get_db() as db:
         trap = ops.get_trap(db, trap_id)
         if not trap:
@@ -49,12 +58,14 @@ def track_start():
 def track_end():
     """Record visit end. Called by tracker.js."""
     data = request.get_json() or {}
-    trap_id = data.get("trap_id")
+    trap_id = _safe_int(data.get("trap_id"))
     session_id = data.get("session_id")
     if trap_id is None or session_id is None:
         return jsonify({"error": "trap_id and session_id required"}), 400
-    trap_id = int(trap_id)
-    duration = float(data.get("duration") or 0)
+    try:
+        duration = float(data.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0.0
     depth_raw = data.get("depth")
     try:
         depth = int(depth_raw) if depth_raw is not None else None

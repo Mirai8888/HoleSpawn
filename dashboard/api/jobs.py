@@ -15,7 +15,11 @@ jobs_bp = Blueprint("jobs", __name__, url_prefix="/api/jobs")
 def list_jobs():
     status_filter = request.args.get("status")
     job_type = request.args.get("job_type")
-    limit = int(request.args.get("limit") or 50)
+    try:
+        limit = int(request.args.get("limit") or 50)
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(limit, 500))
     with get_db() as db:
         items = ops.list_jobs(db, status=status_filter, job_type=job_type, limit=limit)
         return jsonify([{

@@ -16,7 +16,11 @@ intel_bp = Blueprint("intel", __name__, url_prefix="/api/intel")
 @intel_bp.route("/networks", methods=["GET"])
 @login_required
 def list_networks():
-    limit = int(request.args.get("limit") or 50)
+    try:
+        limit = int(request.args.get("limit") or 50)
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(limit, 500))
     with get_db() as db:
         items = ops.list_networks(db, limit=limit)
         return jsonify([{
