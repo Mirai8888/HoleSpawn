@@ -19,8 +19,8 @@ from holespawn.network.graph_analysis import (
     build_network_analysis,
     network_analysis_to_dict,
 )
-from holespawn.network.node_profiler import profile_key_nodes
-from holespawn.network.vulnerability_map import generate_network_report
+from holespawn.network.node_profiler import NodeProfile, profile_key_nodes
+from holespawn.network.vulnerability_map import extract_community_themes, generate_network_report
 from holespawn.network.visualizer import generate_network_graph_html
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,20 @@ def _top_key_node_usernames(analysis: NetworkAnalysis, top_n: int) -> list[str]:
         if len(out) >= top_n:
             break
     return out[:top_n]
+
+
+def _node_profiles_to_viz_dict(profiles: list[NodeProfile]) -> dict[str, dict[str, Any]]:
+    """Convert list[NodeProfile] to dict for visualizer (profile_summary, approach_vectors, etc.)."""
+    return {
+        p.username: {
+            "profile_summary": (p.influence_assessment or "")[:500],
+            "approach_vectors": p.approach_vectors,
+            "position_summary": f"Community {p.community_id}, role {p.role}",
+            "role": p.role,
+            "strategic_value_score": p.strategic_value_score,
+        }
+        for p in profiles
+    }
 
 
 def run_network_graph_pipeline(
@@ -156,7 +170,7 @@ def run_network_graph_pipeline(
         json.dump(analysis_dict, f, indent=2)
     _log(f"  {out_json.name}")
 
-    node_profiles: dict[str, dict[str, Any]] = {}
+    node_profiles: list[NodeProfile] = []
     if not communities_only and top_nodes > 0:
         key_usernames = _top_key_node_usernames(analysis, top_nodes)
         _log(f"Profiling {len(key_usernames)} key nodes (tweets + LLM synthesis)...")
@@ -172,6 +186,16 @@ def run_network_graph_pipeline(
         if tracker.get_cost() > tracker.max_cost:
             raise RuntimeError(
                 f"Network profiling cost ${tracker.get_cost():.2f} exceeded budget ${tracker.max_cost:.2f}"
+            )
+        if node_profiles:
+            _log("Extracting community themes...")
+            extract_community_themes(
+                analysis,
+                node_profiles,
+                tracker=tracker,
+                provider=provider,
+                model=model,
+                calls_per_minute=calls_per_minute,
             )
 
     _log("Generating network vulnerability report...")
@@ -192,9 +216,10 @@ def run_network_graph_pipeline(
     if not no_viz:
         _log("Generating network graph visualization...")
         html_path = output_dir / "network_graph.html"
+        viz_profiles = _node_profiles_to_viz_dict(node_profiles)
         generate_network_graph_html(
             analysis,
-            node_profiles,
+            viz_profiles,
             html_path,
             target_username=target_username,
         )
@@ -205,7 +230,7 @@ def run_network_graph_pipeline(
     return {
         "network_data": network_data,
         "analysis": analysis,
-        "node_profiles": node_profiles,
+        "node_profiles": node_profiles,  # list[NodeProfile]
         "report_path": str(report_path),
         "viz_path": viz_path,
     }

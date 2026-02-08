@@ -326,6 +326,7 @@ def fetch_network_data(
         interactions = _extract_interactions_from_tweet_items(target, tweet_items)
         inner_circle = _rank_connections(target, following, followers, interactions, inner_circle_size)
         mutuals = list(set(following) & set(followers))
+        # Edge weights: follow=1 each direction, mutual adds 1, interaction adds count (target only)
         for u in following:
             _add_edge(target, u, 1.0, "follow")
         for u in followers:

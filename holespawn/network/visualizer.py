@@ -57,7 +57,10 @@ def generate_network_graph_html(
         radius = 0.3 + 0.9 * (bet / bet_max) if bet_max else 0.5
         role = "bridge" if n in bridge_usernames else ("entry" if n in vulnerable_usernames else "node")
         prof = node_profiles.get(n, {})
+        score = prof.get("strategic_value_score")
         tooltip = f"@{n} | Community {cid} | {role}"
+        if score is not None:
+            tooltip += f" | Value {score}/10"
         profile_summary = (prof.get("profile_summary") or "")[:300]
         approach = json.dumps(prof.get("approach_vectors") or [])[:200]
         node_data.append({

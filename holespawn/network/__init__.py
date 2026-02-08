@@ -11,6 +11,7 @@ from .graph_analysis import (
     build_network_analysis,
     network_analysis_to_dict,
 )
+from .node_profiler import NodeProfile, profile_key_nodes
 from .pipeline import run_network_graph_pipeline
 
 __all__ = [
@@ -21,5 +22,7 @@ __all__ = [
     "NetworkAnalysis",
     "build_network_analysis",
     "network_analysis_to_dict",
+    "NodeProfile",
+    "profile_key_nodes",
     "run_network_graph_pipeline",
 ]
