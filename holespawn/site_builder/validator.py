@@ -53,6 +53,19 @@ class SiteValidator:
         return True
 
     def validate_js(self) -> bool:
+        # Only require app.js if the site references it (e.g. legacy/dynamic generators).
+        # Pure generator outputs only inline script and does not use app.js.
+        site_refs_app_js = False
+        for html_path in self.site_dir.glob("*.html"):
+            try:
+                if "app.js" in html_path.read_text(encoding="utf-8"):
+                    site_refs_app_js = True
+                    break
+            except OSError:
+                pass
+        if not site_refs_app_js:
+            return True
+
         js_file = self.site_dir / "app.js"
         if not js_file.exists():
             self.errors.append("Missing app.js")

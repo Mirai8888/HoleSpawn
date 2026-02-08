@@ -18,6 +18,8 @@ class SocialContent:
     raw_text: str = ""
     # Optional Discord export payload; when set, profile building uses Discord-specific signals
     discord_data: dict | None = None
+    # Image/media URLs from posts (e.g. Twitter); used to drive design system when available
+    media_urls: list[str] = field(default_factory=list)
 
     def iter_posts(self) -> Iterator[str]:
         for p in self.posts:

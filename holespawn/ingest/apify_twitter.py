@@ -77,16 +77,50 @@ def _item_to_text(item: Any) -> str:
     return str(item)
 
 
-def _run_scraper(client: Any, actor_id: str, run_input: dict) -> list[str]:
-    """Run one Apify actor and return list of tweet texts. Raises on API error."""
+def _item_media_urls(item: Any) -> list[str]:
+    """Extract image URLs from a single dataset item (Twitter entities / extended_entities / media)."""
+    urls: list[str] = []
+    if not isinstance(item, dict):
+        return urls
+    for key in ("extended_entities", "entities", "media"):
+        container = item.get(key)
+        if key == "media":
+            media_list = container if isinstance(container, list) else None
+        elif isinstance(container, dict):
+            media_list = container.get("media")
+        else:
+            media_list = None
+        if not isinstance(media_list, list):
+            continue
+        for m in media_list:
+            if not isinstance(m, dict):
+                continue
+            # Prefer photo over video for design extraction
+            mtype = (m.get("type") or "").lower()
+            if mtype and mtype != "photo" and mtype != "image":
+                continue
+            u = m.get("media_url_https") or m.get("media_url") or m.get("url")
+            if u and isinstance(u, str) and u not in urls:
+                urls.append(u)
+    return urls
+
+
+def _run_scraper(client: Any, actor_id: str, run_input: dict) -> tuple[list[str], list[str]]:
+    """Run one Apify actor; return (tweet texts, image media URLs). Raises on API error."""
     run = client.actor(actor_id).call(run_input=run_input)
     items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-    posts = []
+    posts: list[str] = []
+    media_urls: list[str] = []
+    seen_media: set[str] = set()
     for item in items:
         text = _item_to_text(item).strip()
         if text:
             posts.append(text)
-    return posts
+        for u in _item_media_urls(item):
+            if u not in seen_media:
+                seen_media.add(u)
+                media_urls.append(u)
+    return posts, media_urls
 
 
 def fetch_twitter_apify(username: str, max_tweets: int = 500) -> SocialContent | None:
@@ -111,9 +145,11 @@ def fetch_twitter_apify(username: str, max_tweets: int = 500) -> SocialContent |
 
     # 1) Primary scraper
     try:
-        posts = _run_scraper(client, APIFY_TWITTER_ACTOR, primary_input)
+        posts, media_urls = _run_scraper(client, APIFY_TWITTER_ACTOR, primary_input)
         if posts:
-            return SocialContent(posts=posts, raw_text="\n".join(posts))
+            return SocialContent(
+                posts=posts, raw_text="\n".join(posts), media_urls=media_urls
+            )
         logger.info(
             "Primary Twitter scraper returned no tweets for @%s, trying fallbacks...",
             username,
@@ -130,7 +166,7 @@ def fetch_twitter_apify(username: str, max_tweets: int = 500) -> SocialContent |
         name = cfg["name"]
         try:
             run_input = cfg["build_input"](username, max_tweets)
-            posts = _run_scraper(client, name, run_input)
+            posts, media_urls = _run_scraper(client, name, run_input)
             if posts:
                 logger.info(
                     "Fallback scraper %s returned %d tweets for @%s",
@@ -138,7 +174,9 @@ def fetch_twitter_apify(username: str, max_tweets: int = 500) -> SocialContent |
                     len(posts),
                     username,
                 )
-                return SocialContent(posts=posts, raw_text="\n".join(posts))
+                return SocialContent(
+                    posts=posts, raw_text="\n".join(posts), media_urls=media_urls
+                )
         except Exception as e:
             logger.warning("Fallback %s failed for @%s: %s", name, username, e)
             continue

@@ -13,7 +13,7 @@ from typing import Any
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
-from holespawn.llm import call_llm
+from holespawn.llm import call_llm, call_llm_vision
 from holespawn.profile import PsychologicalProfile
 
 logger = logging.getLogger(__name__)
@@ -168,7 +168,30 @@ Design a website structure that would trap THIS person's attention. 10-20 pages.
     pages = data.get("pages", [])
     if not any(p.get("filename") == "index.html" for p in pages) and pages:
         pages[0]["filename"] = "index.html"
+    _sanitize_structure_links(pages)
     return {"pages": pages}
+
+
+def _sanitize_structure_links(pages: list[dict[str, Any]]) -> None:
+    """Ensure every page's links_to only references existing filenames; backfill so each has 3–8 links. Mutates pages in place."""
+    filenames = {p.get("filename") for p in pages if p.get("filename")}
+    if not filenames:
+        return
+    other_by_page = {fn: [f for f in filenames if f != fn] for fn in filenames}
+    for page in pages:
+        fn = page.get("filename")
+        links = list(page.get("links_to", []))
+        valid = [f for f in links if f in filenames and f != fn]
+        others = other_by_page.get(fn) or []
+        # Keep order, then append from others until we have 3–8 links (no duplicates)
+        seen = set(valid)
+        for o in others:
+            if len(valid) >= 8:
+                break
+            if o not in seen:
+                seen.add(o)
+                valid.append(o)
+        page["links_to"] = valid[:8]
 
 
 DESIGN_SYSTEM_SYSTEM = """You are generating a complete CSS design system that will psychologically capture one specific person. The goal is not to "look nice" but to create an aesthetic that feels personally resonant, guides their attention to engagement hooks, and makes exploration feel more natural than leaving. Design is an active component of the trap.
@@ -239,10 +262,21 @@ STRUCTURAL DIVERSITY: Different pages use different body classes: .layout-articl
 Return ONLY valid CSS. No markdown, no comments, no explanation. Start with :root, then body, then elements. Use the exact class names above."""
 
 
+VISION_AESTHETIC_SYSTEM = """You are a design analyst. Look at the images provided (they are images this person posts on social media).
+
+Describe their visual aesthetic in one short paragraph for a web design brief. Include:
+- Dominant colors (hex codes if you can infer them, e.g. #1a1a2e, #e94560)
+- Mood (dark, bright, minimal, chaotic, nostalgic, etc.)
+- Style hints (e.g. high contrast, muted, neon, earthy)
+
+Output only the paragraph, no preamble."""
+
+
 def generate_design_system(
     profile: PsychologicalProfile,
     spec: Any = None,
     *,
+    media_urls: list[str] | None = None,
     call_llm_fn: Callable[..., str] = call_llm,
     tracker: CostTracker | None = None,
     provider: str | None = None,
@@ -251,10 +285,26 @@ def generate_design_system(
 ) -> str:
     """
     Canonical design system generator. Returns full CSS from profile (and optional spec).
-    All builders should use this instead of preset lookups. Design is tuned for psychological
-    capture: resonant aesthetic, attention to hooks, exploration favored over exit.
+    When media_urls are provided, uses vision to derive visual hints from images the
+    person posts and injects them into the design prompt.
     """
     p = _profile_for_design_prompt(profile)
+    visual_ref = ""
+    if media_urls:
+        aesthetic = call_llm_vision(
+            VISION_AESTHETIC_SYSTEM,
+            "Describe the visual aesthetic of these images for a web design brief.",
+            media_urls,
+            provider_override=provider,
+            model_override=model,
+            max_tokens=512,
+            operation="design_vision",
+            tracker=tracker,
+            calls_per_minute=calls_per_minute,
+        )
+        if aesthetic:
+            visual_ref = aesthetic
+            logger.info("Design vision from posted images: %s", aesthetic[:80] + "..." if len(aesthetic) > 80 else aesthetic)
     user_parts = [
         "TARGET PERSON — generate a design system that will psychologically capture them.",
         "",
@@ -282,6 +332,14 @@ def generate_design_system(
         f"- Cultural references: {', '.join(p['cultural_references'][:8]) if p['cultural_references'] else 'N/A'}",
         f"- Sentiment: {p['sentiment_compound']:.2f}, Intensity: {p['intensity']:.2f}",
     ]
+    if visual_ref:
+        user_parts.extend(
+            [
+                "",
+                "VISUAL REFERENCE FROM THEIR POSTED IMAGES (match this aesthetic in your CSS):",
+                visual_ref,
+            ]
+        )
     # Discord context (when profile from Discord data)
     if p.get("tribal_affiliations") or p.get("reaction_triggers") or p.get("engagement_rhythm"):
         user_parts.extend(
@@ -344,18 +402,23 @@ def generate_css(
 
 CONTENT_SYSTEM = """Generate the body content for one webpage. You will receive:
 - Page specs (topic, hook, content_type, which pages to link to)
-- Full profile of the target person (vocabulary, voice, interests)
+- Full profile of the target person: vocabulary, sample_phrases (their actual tweet-like lines), sentence length, style
 - List of available pages to link to
 
-TASK: Write content that sounds like THEY wrote it and keeps THEM clicking.
+TASK: Write so it sounds like THIS PERSON wrote it—not like a journalist, essayist, or "good writer." A reader who knows their tweets should think they wrote the page.
 
-Requirements:
-1. Use THEIR vocabulary naturally. Match THEIR voice exactly.
-2. Reference THEIR specific interests (not generic).
-3. Embed 5-8 hyperlinks as <a href="filename.html">anchor text</a> in the body. Link naturally in the text. Use compelling anchor text. Link only to filenames from the links_to list or available pages.
-4. End with unresolved tension or new questions—no conclusion.
-5. No generic mystery-speak ("protocol", "nexus", "ephemeral") unless that's their style.
-6. Return valid HTML: <h2>, <p>, <a> as needed. Body content only—no <html> or <body> tags.
+VOICE RULES (non-negotiable):
+1. Match their SENTENCE LENGTH. If their avg_sentence_length is under 12, write SHORT sentences. If they write punchy fragments or run-ons, mirror that. Do NOT default to long, flowing essay paragraphs.
+2. Copy the RHYTHM of their sample_phrases. Those are real excerpts from their writing. Your sentences should feel like those—same cadence, same kind of line breaks, same tone (casual, cryptic, unpolished, etc.).
+3. Use THEIR words and phrases from the profile. Reuse their exact tics (capitalization, abbreviations, emoji level) when the profile shows them.
+4. Do NOT sound like: literary fiction, dimes square, Substack essay, Reddit think-piece, or generic "insightful" prose. No "The way X... it's something else." No "Don't get me started on." No "there's something bigger here." No polished transitions. Sound like THEM.
+5. If they're sparse and punchy, be sparse and punchy. If they're rambling, ramble. If they never use big abstract nouns, don't use them.
+
+TECHNICAL (non-negotiable):
+- You MUST embed at least 5–8 inline hyperlinks in the body as <a href="filename.html">anchor text</a>. Use double quotes: href="...". Link only to filenames from the links_to list. Weave links into sentences; do not put all links in a list at the end.
+- End with unresolved tension or a question—no neat conclusion.
+- No generic mystery-speak ("protocol", "nexus", "ephemeral") unless their sample_phrases/vocabulary show that.
+- Return valid HTML: <h2>, <p>, <a> as needed. Body content only—no <html> or <body> tags.
 """
 
 
@@ -370,33 +433,47 @@ def generate_page_content(
     model: str | None = None,
     calls_per_minute: int = 20,
     min_links: int = 3,
-    max_retries: int = 2,
+    max_retries: int = 3,
 ) -> str:
     """LLM generates HTML body for one page with embedded links. Retries if link count < min_links (accept after max_retries)."""
     p = _profile_for_prompt(profile)
+    current_fn = page_spec.get("filename")
     linkable = [
         f"{x['filename']} - {x.get('title', '')}"
         for x in all_pages
-        if x.get("filename") != page_spec.get("filename")
+        if x.get("filename") != current_fn
     ]
-    links_to = page_spec.get("links_to", [])[:8]
+    links_to = list(page_spec.get("links_to", []))[:8]
+    # Never pass empty links_to: LLM will add no links. Fallback to other page filenames.
+    if not links_to and linkable:
+        links_to = [
+            x.get("filename", "").strip()
+            for x in all_pages
+            if x.get("filename") and x.get("filename") != current_fn
+        ][:8]
+
+    avg_sent = getattr(profile, "avg_sentence_length", None)
+    sent_len_note = f" (AVERAGE {avg_sent:.0f} words per sentence—write SHORT sentences like theirs)" if avg_sent is not None and avg_sent < 15 else ""
 
     user = f"""PAGE SPECS:
 Topic: {page_spec.get("topic", "")}
 Purpose/hook: {page_spec.get("hook", "")}
 Type: {page_spec.get("content_type", "article")}
-Must link to these filenames: {json.dumps(links_to)}
+REQUIRED LINKS — you MUST include <a href="filename.html">...</a> for at least 3 of these (use exact filename):
+{chr(10).join('- ' + f for f in links_to)}
 
-TARGET PERSON:
-Writes like: {json.dumps(p["sample_phrases"][:10])}
-Uses words: {", ".join(p["vocabulary_sample"][:40]) if p["vocabulary_sample"] else "N/A"}
-Cares about: {", ".join(p["obsessions"][:8]) if p["obsessions"] else "N/A"}
-Style: {p["communication_style"]}
+TARGET PERSON — copy this voice exactly:
+- Their actual phrases (use these as rhythm/tone reference): {json.dumps(p["sample_phrases"][:14])}
+- Sentence structure: {p["sentence_structure"]}{sent_len_note}
+- Words they use: {", ".join(p["vocabulary_sample"][:40]) if p["vocabulary_sample"] else "N/A"}
+- Interests/obsessions: {", ".join(p["obsessions"][:8]) if p["obsessions"] else "N/A"}
+- Communication style: {p["communication_style"]}
+- Emoji level: {p.get("emoji_usage", "none")}
 
 AVAILABLE PAGES TO LINK TO (use exact filename in href):
 {json.dumps(linkable, indent=2)}
 
-Write content in their voice. Embed at least 3 (ideally 5-8) <a href="filename.html">anchor</a> links. No resolution—end with open questions. Return HTML body content only."""
+Write like THEY would write—same sentence length and rhythm as their sample_phrases. Not like an essay or think-piece. You MUST embed at least 3 and ideally 5-8 inline <a href="filename.html">anchor</a> links in the paragraphs (use double quotes in href="..."). No resolution—end with open questions. Return HTML body content only."""
 
     for attempt in range(max_retries + 1):
         raw = call_llm_fn(
@@ -414,7 +491,8 @@ Write content in their voice. Embed at least 3 (ideally 5-8) <a href="filename.h
             m = re.search(r"```(?:html)?\s*([\s\S]*?)```", content)
             if m:
                 content = m.group(1).strip()
-        link_count = content.count("<a href=")
+        # Count both double- and single-quoted hrefs so we don't reject valid output
+        link_count = content.count('<a href="') + content.count("<a href='")
         if link_count >= min_links:
             return content
         if attempt < max_retries:
@@ -435,7 +513,19 @@ Write content in their voice. Embed at least 3 (ideally 5-8) <a href="filename.h
                 min_links,
                 max_retries + 1,
             )
-    return content
+    # If we still have no inline links, append an "Explore" block so the page has clickable links
+    if link_count < 1 and links_to:
+        by_fn = {p.get("filename"): p for p in all_pages if p.get("filename")}
+        parts = []
+        for fn in links_to[:6]:
+            target = by_fn.get(fn)
+            title = (target.get("title") or fn) if target else fn
+            fn_esc = html.escape(fn, quote=True)
+            title_esc = html.escape(str(title), quote=True)
+            parts.append(f'<a href="{fn_esc}">{title_esc}</a>')
+        if parts:
+            content = (content or "").strip() + '\n<p class="explore-links">Explore: ' + " · ".join(parts) + "</p>"
+    return content or ""
 
 
 def validate_site(structure: dict[str, Any], min_pages: int = 5) -> None:
@@ -451,7 +541,7 @@ def validate_site(structure: dict[str, Any], min_pages: int = 5) -> None:
             errors.append("Page missing filename")
             continue
         content = page.get("content", "")
-        link_count = content.count("<a href=") if content else 0
+        link_count = (content.count('<a href="') + content.count("<a href='")) if content else 0
         if link_count < 3:
             errors.append(f"{fn} has only {link_count} links (need at least 3)")
         for link in page.get("links_to", []):
@@ -618,6 +708,7 @@ def generate_site_from_profile(
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    media_urls = list(getattr(content, "media_urls", [])) if content else []
 
     logger.info("Generating site structure from profile...")
     structure = generate_site_structure(
@@ -635,6 +726,7 @@ def generate_site_from_profile(
     css = generate_design_system(
         profile,
         spec=None,
+        media_urls=media_urls or None,
         call_llm_fn=call_llm_fn,
         tracker=tracker,
         provider=provider,

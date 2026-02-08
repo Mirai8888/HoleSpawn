@@ -112,6 +112,33 @@ def _call_anthropic(
     return text, inp, out
 
 
+def _call_anthropic_vision(
+    system: str,
+    user_text: str,
+    image_urls: list[str],
+    api_key: str,
+    model: str,
+    max_tokens: int,
+) -> tuple[str, int, int]:
+    """Anthropic Messages API with image URL blocks + text."""
+    import anthropic
+
+    content: list[dict[str, Any]] = []
+    for url in image_urls:
+        content.append({"type": "image", "source": {"type": "url", "url": url}})
+    content.append({"type": "text", "text": user_text})
+    client = anthropic.Anthropic(api_key=api_key)
+    resp = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        system=system,
+        messages=[{"role": "user", "content": content}],
+    )
+    text = (resp.content[0].text or "") if resp.content else ""
+    inp, out = _usage_from_response("anthropic", resp)
+    return text, inp, out
+
+
 def _call_openai(
     system: str,
     user_content: str,
@@ -132,6 +159,35 @@ def _call_openai(
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user_content},
+        ],
+    )
+    text = (resp.choices[0].message.content or "") if resp.choices else ""
+    inp, out = _usage_from_response("openai", resp)
+    return text, inp, out
+
+
+def _call_openai_vision(
+    system: str,
+    user_text: str,
+    image_urls: list[str],
+    api_key: str,
+    model: str,
+    max_tokens: int,
+) -> tuple[str, int, int]:
+    """OpenAI Chat Completions with vision: user message content = image_url parts + text."""
+    from openai import OpenAI
+
+    content: list[dict[str, Any]] = []
+    for url in image_urls:
+        content.append({"type": "image_url", "image_url": {"url": url}})
+    content.append({"type": "text", "text": user_text})
+    client = OpenAI(api_key=api_key)
+    resp = client.chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": content},
         ],
     )
     text = (resp.choices[0].message.content or "") if resp.choices else ""
@@ -252,3 +308,60 @@ def call_llm(
     if tracker:
         tracker.add_usage(inp, out, operation=operation or "llm_call")
     return text
+
+
+def call_llm_vision(
+    system: str,
+    user_text: str,
+    image_urls: list[str],
+    *,
+    provider_override: str | None = None,
+    model_override: str | None = None,
+    api_base_override: str | None = None,
+    max_tokens: int = 1024,
+    operation: str = "llm_vision",
+    tracker: CostTracker | None = None,
+    calls_per_minute: int = 20,
+    max_images: int = 5,
+) -> str | None:
+    """
+    Call a vision-capable LLM with image URLs + text. Used to derive design hints from
+    images the subject posts. Supports Anthropic and OpenAI only; returns None for
+    other providers (no vision). Limits to max_images URLs.
+    """
+    urls = (image_urls or [])[:max_images]
+    if not urls:
+        return None
+    prov, api_key, model, api_base = get_provider_and_key(
+        provider_override, api_base_override, model_override
+    )
+    model = model_override or model
+    if prov not in ("anthropic", "openai"):
+        return None
+
+    @rate_limit(calls_per_minute=calls_per_minute)
+    def _do() -> tuple[str, int, int]:
+        if prov == "anthropic":
+            return _call_anthropic_vision(
+                system, user_text, urls, api_key, model, max_tokens
+            )
+        return _call_openai_vision(
+            system, user_text, urls, api_key, model, max_tokens
+        )
+
+    exc_types = _llm_api_exception_types()
+    try:
+        if exc_types:
+            try:
+                text, inp, out = _do()
+            except exc_types as e:
+                raise RuntimeError(
+                    f"Vision LLM call failed (provider={prov} model={model}): {e}"
+                ) from e
+        else:
+            text, inp, out = _do()
+    except Exception:
+        return None
+    if tracker:
+        tracker.add_usage(inp, out, operation=operation)
+    return text.strip() if text else None
