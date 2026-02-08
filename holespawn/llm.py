@@ -47,7 +47,7 @@ def get_provider_and_key(
 
     if prov == "anthropic":
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        model = model_override or os.getenv("HOLESPAWN_CLAUDE_MODEL") or "claude-3-5-sonnet-20241022"
+        model = model_override or os.getenv("HOLESPAWN_CLAUDE_MODEL") or "claude-sonnet-4-20250514"
     elif prov == "google":
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         model = model_override or os.getenv("HOLESPAWN_GEMINI_MODEL") or "gemini-2.5-flash"
@@ -150,7 +150,12 @@ def _call_google(
     max_tokens: int,
 ) -> tuple[str, int, int]:
     from google import genai  # type: ignore
-    client = genai.Client(api_key=api_key)
+    # Request timeout (ms): avoid indefinite hang; structure generation can take 1–2 min
+    try:
+        from google.genai.types import HttpOptions
+        client = genai.Client(api_key=api_key, http_options=HttpOptions(timeout=180_000))
+    except (ImportError, TypeError):
+        client = genai.Client(api_key=api_key)
     full = f"{system}\n\n{user_content}"
     resp = client.models.generate_content(
         model=model,

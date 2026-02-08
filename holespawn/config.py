@@ -51,7 +51,7 @@ def get_llm_config(
     else:
         config = {
             "api_base": api_base or os.getenv("LLM_API_BASE"),
-            "model": model or os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022"),
+            "model": model or os.getenv("LLM_MODEL", "claude-sonnet-4-20250514"),
             "provider": provider or "anthropic",
         }
     if api_base is not None:
@@ -66,7 +66,7 @@ def get_llm_config(
 DEFAULT_CONFIG: dict[str, Any] = {
     "llm": {
         "provider": "anthropic",
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-20250514",
         "max_tokens": 4000,
         "temperature": 0.7,
     },

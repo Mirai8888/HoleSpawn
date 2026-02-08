@@ -65,7 +65,7 @@ class DiscordLLMSynthesizer:
             self.model = config.get("model")
         else:
             self.api_base = api_base or os.getenv("LLM_API_BASE")
-            self.model = model or os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022")
+            self.model = model or os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
         self.preset = preset
 
     def _call(self, system: str, user: str, tracker: Optional[CostTracker] = None) -> str:

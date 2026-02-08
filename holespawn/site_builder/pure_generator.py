@@ -151,6 +151,7 @@ PSYCHOLOGY: Sentiment {p['sentiment_compound']:.2f}, Intensity {p['intensity']:.
 
 Design a website structure that would trap THIS person's attention. 10-20 pages. One page must be index.html. Every page links_to 3-8 other pages. Return JSON only."""
 
+    logger.info("Generating site structure (may take 1–2 minutes)...")
     raw = call_llm_fn(
         STRUCTURE_SYSTEM,
         user,
@@ -355,10 +356,10 @@ def generate_page_content(
     provider: Optional[str] = None,
     model: Optional[str] = None,
     calls_per_minute: int = 20,
-    min_links: int = 5,
+    min_links: int = 3,
     max_retries: int = 2,
 ) -> str:
-    """LLM generates HTML body for one page with embedded links. Retries if link count < min_links."""
+    """LLM generates HTML body for one page with embedded links. Retries if link count < min_links (accept after max_retries)."""
     p = _profile_for_prompt(profile)
     linkable = [f"{x['filename']} - {x.get('title', '')}" for x in all_pages if x.get("filename") != page_spec.get("filename")]
     links_to = page_spec.get("links_to", [])[:8]
@@ -378,7 +379,7 @@ Style: {p['communication_style']}
 AVAILABLE PAGES TO LINK TO (use exact filename in href):
 {json.dumps(linkable, indent=2)}
 
-Write content in their voice. Embed 5-8 <a href="filename.html">anchor</a> links. No resolution—end with open questions. Return HTML body content only."""
+Write content in their voice. Embed at least 3 (ideally 5-8) <a href="filename.html">anchor</a> links. No resolution—end with open questions. Return HTML body content only."""
 
     for attempt in range(max_retries + 1):
         raw = call_llm_fn(
@@ -399,8 +400,11 @@ Write content in their voice. Embed 5-8 <a href="filename.html">anchor</a> links
         link_count = content.count("<a href=")
         if link_count >= min_links:
             return content
-        logger.warning("Page %s has %d links (min %d), retrying...", page_spec.get("filename"), link_count, min_links)
-        user += f"\n\nPREVIOUS ATTEMPT had only {link_count} links. You MUST include at least {min_links} <a href=\"...\"> links in the body."
+        if attempt < max_retries:
+            logger.warning("Page %s has %d links (min %d), retrying (%d/%d)...", page_spec.get("filename"), link_count, min_links, attempt + 1, max_retries + 1)
+            user += f"\n\nPREVIOUS ATTEMPT had only {link_count} links. You MUST include at least {min_links} <a href=\"...\"> links in the body."
+        else:
+            logger.info("Page %s has %d links (min %d); accepting after %d attempts.", page_spec.get("filename"), link_count, min_links, max_retries + 1)
     return content
 
 

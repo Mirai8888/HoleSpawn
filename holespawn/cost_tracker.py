@@ -36,7 +36,8 @@ DEFAULT_PRICING: dict[str, tuple[float, float]] = {
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4o": (2.50, 10.00),
     "claude-sonnet-3.5": (3.00, 15.00),
-    "claude-3-5-sonnet-20241022": (3.00, 15.00),
+    "claude-sonnet-4-20250514": (3.00, 15.00),
+    "claude-3-5-sonnet-20241022": (3.00, 15.00),  # deprecated Oct 2025
     "claude-3-haiku": (0.25, 1.25),
 }
 
@@ -180,7 +181,7 @@ class CostTracker:
 
     def print_summary(self) -> None:
         cost = self.get_cost()
-        print("\n💰 API usage summary")
+        print("\nAPI usage summary")
         print(f"   Model: {self.model}")
         print(f"   Input tokens:  {self.input_tokens:,}")
         print(f"   Output tokens: {self.output_tokens:,}")

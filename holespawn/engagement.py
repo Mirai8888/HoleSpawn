@@ -1,6 +1,7 @@
 """
-Engagement brief: vulnerability map (social-engineering style), DM/interaction ideas,
-and orchestration plan. For artistic/ARG design only — consent and ethics apply.
+Engagement brief for narrative engineering: psychological profile + social-engineering
+framework to shape or steer a person via narrative. Vulnerability map, contact strategies,
+phased engagement sequence.
 """
 
 from typing import Optional
@@ -12,28 +13,40 @@ from holespawn.llm import call_llm
 from holespawn.profile import PsychologicalProfile
 
 
-ENGAGEMENT_SYSTEM = """You are an analyst for an artistic/ARG (Alternate Reality Game) project. Your output is used only for designing immersive, personalized experiences with consent — for art and entertainment.
+ENGAGEMENT_SYSTEM = """You are an analyst producing a **narrative engineering** brief. The goal is to profile one person so they can be shaped or steered through narrative — i.e. what stories, information flows, and social dynamics will move them toward desired beliefs, actions, or roles.
 
-You receive a psychological profile and raw narrative (Twitter/social text) for one person. Produce an **engagement brief** that maps how to design interactions and orchestration so the experience resonates. Frame this in a social-engineering sense: what emotional triggers, trust hooks, and susceptibilities does the profile suggest? What DM (direct message) or interaction angles would feel natural and engaging? What’s a phased orchestration plan (how to introduce the rabbit hole, when to deepen, pacing)?
+You receive a psychological profile and raw narrative (e.g. social media) for one person. Produce an **engagement brief** that maps:
+- Vulnerability map: emotional triggers, trust hooks, resistance points, susceptibilities (what narrative levers work on this profile).
+- Contact/approach ideas: concrete ways to open and deepen contact.
+- Engagement sequence: phased plan for approach → rapport → embedding narratives → reinforcing alignment → landing the desired outcome. Phases 3 onward must be about **narrative engineering** (embedding stories, shaping belief, anchoring behavior), not puzzles, games, or “revelation/transformation” story arcs.
+
+Do not use: ARG, alternate reality game, puzzles, investigations, “core narrative,” “revelation,” “transformation,” “cathartic resolution.” Do use: narrative embedding, information flow, belief shaping, role positioning, anchoring outcome, desired behavior.
 
 Output valid markdown only. Use exactly these sections (keep headers as-is):
 
 ## Vulnerability map (social-engineering lens)
-- **Emotional triggers**: What topics or framings tend to elicit strong engagement (hope, fear, curiosity, belonging, etc.).
-- **Trust hooks**: What would make this person feel safe to engage (authority, peer similarity, mystery, proof, etc.).
-- **Resistance points**: What might make them disengage or distrust (tone, pace, obvious manipulation, etc.).
-- **Susceptibilities**: Summary of themes/language that this profile is most receptive to (for designing copy and interactions).
+- **Emotional triggers**: Topics or framings that elicit strong engagement (hope, fear, curiosity, belonging, status, etc.).
+- **Trust hooks**: What would make this person feel safe to engage (authority, peer similarity, proof, shared references, etc.).
+- **Resistance points**: What might make them disengage or distrust (tone, pace, obvious persuasion, mismatch with identity, etc.).
+- **Susceptibilities**: Themes, language, and levers this profile is most receptive to (for narrative and copy design).
 
-## DM / interaction ideas
-List 5–10 concrete angles for opening or deepening contact (e.g. first DM, follow-up, or in-world interaction). Each idea: 1–2 sentences. Vary tone and channel (curiosity, shared interest, mystery, challenge, etc.).
+## Contact / approach ideas
+List 5–10 concrete angles for opening or deepening contact (first message, follow-up, channels). Each idea: 1–2 sentences. Vary tone (curiosity, shared interest, authority, scarcity, social proof). Focus on what would feel natural and effective for this profile.
 
-## Orchestration plan
-A phased plan (3–5 phases) for rolling out the experience:
-- **Phase 1**: How to introduce (first touch, hook).
-- **Phase 2–4**: How to deepen (pacing, reveals, puzzles or narrative beats).
-- **Phase 5**: How to land or resolve (optional).
+## Engagement sequence
+A phased plan (3–5 phases) for narrative engineering this person. Be specific to the profile.
 
-Keep each phase to 2–4 sentences. Be specific to the profile (themes, tone, susceptibilities).
+- **Phase 1**: Initial approach — first touch, hook, channel. How to get a response and establish credibility. Shared interests, tone, pacing.
+
+- **Phase 2**: Deepen rapport — “discoveries,” synchronicities, or exclusive content that build on their worldview. Position them as insider or part of a select group. Still trust-building, not yet steering.
+
+- **Phase 3**: Embed narratives — introduce storylines, information flows, or themes that align with their beliefs and pull them toward desired directions. Use their susceptibilities; make it feel self-directed, not pitched. No puzzles or game mechanics.
+
+- **Phase 4**: Reinforce and align — repetition, social proof, exclusive access. Shape what they consider true or important; position them inside a narrative where their role or identity is clear. Tighten alignment with desired outcomes.
+
+- **Phase 5**: Land the outcome — anchor the desired result (belief, commitment, action, ongoing relationship). Concrete next step or behavioral anchor. No “revelation” or “transformation” — operational outcome.
+
+Keep each phase to 2–4 sentences. Be specific to the profile. No ARG, puzzle, or story-arc language in phases 3–5.
 
 Do not add preamble or meta-commentary. Output only the markdown document."""
 

@@ -406,7 +406,7 @@ def main() -> None:
     # Cost tracker (needed for Discord hybrid profile LLM calls)
     cfg_llm = config.get("llm", {})
     cfg_costs = config.get("costs", {})
-    model = cfg_llm.get("model", "claude-3-5-sonnet-20241022")
+    model = cfg_llm.get("model", "claude-sonnet-4-20250514")
     if os.getenv("LLM_MODEL"):
         model = os.getenv("LLM_MODEL")
     def _cost_env(name: str, default: float) -> float:
