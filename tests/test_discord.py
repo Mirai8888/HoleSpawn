@@ -8,7 +8,7 @@ import pytest
 
 def test_load_from_discord_returns_social_content():
     """load_from_discord returns SocialContent with posts from messages and discord_data attached."""
-    from holespawn.ingest import load_from_discord, SocialContent
+    from holespawn.ingest import SocialContent, load_from_discord
 
     payload = {
         "user_id": "u1",
@@ -28,7 +28,7 @@ def test_load_from_discord_returns_social_content():
 
 def test_load_from_discord_empty_or_invalid():
     """load_from_discord handles empty dict and non-dict."""
-    from holespawn.ingest import load_from_discord, SocialContent
+    from holespawn.ingest import load_from_discord
 
     empty = load_from_discord({})
     assert empty.posts == []
@@ -42,7 +42,7 @@ def test_load_from_discord_empty_or_invalid():
 
 def test_load_from_discord_file():
     """Load Discord export from JSON file (via load_from_file then discord payload)."""
-    from holespawn.ingest import load_from_file, load_from_discord, SocialContent
+    from holespawn.ingest import load_from_discord
 
     data_dir = Path(__file__).resolve().parent.parent / "data"
     path = data_dir / "sample_discord_export.json"
@@ -85,7 +85,10 @@ def test_build_profile_with_discord_data():
 
     assert hasattr(profile, "tribal_affiliations")
     assert isinstance(profile.tribal_affiliations, list)
-    assert "Build in Public Devs" in profile.tribal_affiliations or len(profile.tribal_affiliations) >= 1
+    assert (
+        "Build in Public Devs" in profile.tribal_affiliations
+        or len(profile.tribal_affiliations) >= 1
+    )
 
     assert hasattr(profile, "reaction_triggers")
     assert isinstance(profile.reaction_triggers, list)
@@ -98,12 +101,15 @@ def test_build_profile_with_discord_data():
 
     assert hasattr(profile, "engagement_rhythm")
     assert isinstance(profile.engagement_rhythm, dict)
-    assert profile.engagement_rhythm.get("peak_hours") == [14, 15] or profile.engagement_rhythm.get("message_frequency") == 3.0 or len(profile.engagement_rhythm) >= 0
+    assert (
+        profile.engagement_rhythm.get("peak_hours") == [14, 15]
+        or profile.engagement_rhythm.get("message_frequency") == 3.0
+        or len(profile.engagement_rhythm) >= 0
+    )
 
 
 def test_build_discord_profile_hybrid_nlp_only():
     """Hybrid Discord profile with use_llm=False uses NLP only (no API call)."""
-    from holespawn.ingest import load_from_discord
     from holespawn.profile.discord_profile_builder import build_discord_profile
 
     payload = {
@@ -135,6 +141,11 @@ def test_build_profile_without_discord_data_has_defaults():
 
     assert getattr(profile, "tribal_affiliations", None) == [] or profile.tribal_affiliations == []
     assert getattr(profile, "reaction_triggers", None) == [] or profile.reaction_triggers == []
-    assert getattr(profile, "conversational_intimacy", "moderate") in ("guarded", "open", "vulnerable", "moderate")
+    assert getattr(profile, "conversational_intimacy", "moderate") in (
+        "guarded",
+        "open",
+        "vulnerable",
+        "moderate",
+    )
     assert getattr(profile, "community_role", "participant") in ("lurker", "participant", "leader")
     assert isinstance(getattr(profile, "engagement_rhythm", {}), dict)

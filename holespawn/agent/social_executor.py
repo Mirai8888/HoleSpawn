@@ -8,18 +8,20 @@ Twitter: Rate limits ~500 DMs/day, ~300 tweets/3hr; add exponential backoff on 4
 
 import asyncio
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 # Optional: Discord and Twitter clients
 _discord = None
 _tweepy = None
 try:
     import discord
+
     _discord = discord
 except ImportError:
     pass
 try:
     import tweepy
+
     _tweepy = tweepy
 except ImportError:
     pass
@@ -28,6 +30,7 @@ except ImportError:
 def _get_target(target_id: int):
     from dashboard.db import get_db
     from dashboard.db import operations as ops
+
     with get_db() as db:
         return ops.get_target(db, target_id)
 
@@ -35,6 +38,7 @@ def _get_target(target_id: int):
 def _get_trap_for_target(target_id: int):
     from dashboard.db import get_db
     from dashboard.db import operations as ops
+
     with get_db() as db:
         traps = ops.list_traps(db, target_id=target_id, is_active=True, limit=1)
         return traps[0] if traps else None
@@ -44,13 +48,14 @@ def _create_engagement(
     target_id: int,
     platform: str,
     engagement_type: str,
-    message_content: Optional[str] = None,
-    reference_id: Optional[str] = None,
+    message_content: str | None = None,
+    reference_id: str | None = None,
     included_trap: bool = False,
-    framing_strategy: Optional[str] = None,
+    framing_strategy: str | None = None,
 ) -> Any:
     from dashboard.db import get_db
     from dashboard.db import operations as ops
+
     with get_db() as db:
         return ops.create_engagement(
             db,
@@ -64,7 +69,7 @@ def _create_engagement(
         )
 
 
-def _frame_trap_link(message: str, trap_link: str, framing: str, profile: Optional[Dict]) -> str:
+def _frame_trap_link(message: str, trap_link: str, framing: str, profile: dict | None) -> str:
     if framing == "mystery":
         return f"{message}\n\nFound something weird you might find interesting: {trap_link}"
     if framing == "curiosity":
@@ -81,7 +86,7 @@ def execute_send_discord_dm(
     message: str,
     include_trap_link: bool = False,
     framing: str = "direct",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Send Discord DM to target."""
     if not _discord:
         return {"status": "unavailable", "error": "discord.py not installed"}
@@ -118,10 +123,19 @@ def execute_send_discord_dm(
                 user = await client.fetch_user(int(discord_user_id))
                 await user.send(message[:2000])
                 e = _create_engagement(
-                    target_id, "discord", "dm",
-                    message_content=message, included_trap=include_trap_link, framing_strategy=framing,
+                    target_id,
+                    "discord",
+                    "dm",
+                    message_content=message,
+                    included_trap=include_trap_link,
+                    framing_strategy=framing,
                 )
-                result = {"status": "sent", "target_id": target_id, "engagement_id": e.id, "platform": "discord"}
+                result = {
+                    "status": "sent",
+                    "target_id": target_id,
+                    "engagement_id": e.id,
+                    "platform": "discord",
+                }
             except Exception as err:
                 result = {"status": "failed", "error": str(err)}
             await client.close()
@@ -141,11 +155,19 @@ def execute_send_twitter_dm(
     message: str,
     include_trap_link: bool = False,
     framing: str = "direct",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Send Twitter DM to target."""
     if not _tweepy:
         return {"status": "unavailable", "error": "tweepy not installed"}
-    if not all(os.getenv(k) for k in ("TWITTER_API_KEY", "TWITTER_API_SECRET", "TWITTER_ACCESS_TOKEN", "TWITTER_ACCESS_SECRET")):
+    if not all(
+        os.getenv(k)
+        for k in (
+            "TWITTER_API_KEY",
+            "TWITTER_API_SECRET",
+            "TWITTER_ACCESS_TOKEN",
+            "TWITTER_ACCESS_SECRET",
+        )
+    ):
         return {"status": "unavailable", "error": "Twitter API credentials not set"}
 
     target = _get_target(target_id)
@@ -162,16 +184,22 @@ def execute_send_twitter_dm(
 
     try:
         auth = _tweepy.OAuth1UserHandler(
-            os.getenv("TWITTER_API_KEY"), os.getenv("TWITTER_API_SECRET"),
-            os.getenv("TWITTER_ACCESS_TOKEN"), os.getenv("TWITTER_ACCESS_SECRET"),
+            os.getenv("TWITTER_API_KEY"),
+            os.getenv("TWITTER_API_SECRET"),
+            os.getenv("TWITTER_ACCESS_TOKEN"),
+            os.getenv("TWITTER_ACCESS_SECRET"),
         )
         api = _tweepy.API(auth)
         # Twitter API v1.1 DM (v2 DM has different flow)
         recipient_id = str(twitter_user_id).replace("@", "").strip()
         resp = api.send_direct_message(recipient_id, message[:10000])
         e = _create_engagement(
-            target_id, "twitter", "dm",
-            message_content=message, included_trap=include_trap_link, framing_strategy=framing,
+            target_id,
+            "twitter",
+            "dm",
+            message_content=message,
+            included_trap=include_trap_link,
+            framing_strategy=framing,
         )
         return {
             "status": "sent",
@@ -184,23 +212,36 @@ def execute_send_twitter_dm(
         return {"status": "failed", "error": str(e)}
 
 
-def execute_reply_to_tweet(target_id: int, tweet_id: str, reply: str) -> Dict[str, Any]:
+def execute_reply_to_tweet(target_id: int, tweet_id: str, reply: str) -> dict[str, Any]:
     """Reply to a tweet."""
     if not _tweepy:
         return {"status": "unavailable", "error": "tweepy not installed"}
-    if not all(os.getenv(k) for k in ("TWITTER_API_KEY", "TWITTER_API_SECRET", "TWITTER_ACCESS_TOKEN", "TWITTER_ACCESS_SECRET")):
+    if not all(
+        os.getenv(k)
+        for k in (
+            "TWITTER_API_KEY",
+            "TWITTER_API_SECRET",
+            "TWITTER_ACCESS_TOKEN",
+            "TWITTER_ACCESS_SECRET",
+        )
+    ):
         return {"status": "unavailable", "error": "Twitter API credentials not set"}
 
     try:
         auth = _tweepy.OAuth1UserHandler(
-            os.getenv("TWITTER_API_KEY"), os.getenv("TWITTER_API_SECRET"),
-            os.getenv("TWITTER_ACCESS_TOKEN"), os.getenv("TWITTER_ACCESS_SECRET"),
+            os.getenv("TWITTER_API_KEY"),
+            os.getenv("TWITTER_API_SECRET"),
+            os.getenv("TWITTER_ACCESS_TOKEN"),
+            os.getenv("TWITTER_ACCESS_SECRET"),
         )
         api = _tweepy.API(auth)
         status = api.update_status(status=reply[:280], in_reply_to_status_id=tweet_id)
         e = _create_engagement(
-            target_id, "twitter", "reply",
-            message_content=reply, reference_id=tweet_id,
+            target_id,
+            "twitter",
+            "reply",
+            message_content=reply,
+            reference_id=tweet_id,
         )
         return {"status": "posted", "tweet_id": status.id, "engagement_id": e.id}
     except Exception as e:
@@ -210,8 +251,8 @@ def execute_reply_to_tweet(target_id: int, tweet_id: str, reply: str) -> Dict[st
 def execute_post_in_discord_channel(
     channel_id: str,
     message: str,
-    reply_to_message_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    reply_to_message_id: str | None = None,
+) -> dict[str, Any]:
     """Post in Discord channel."""
     if not _discord:
         return {"status": "unavailable", "error": "discord.py not installed"}
@@ -253,7 +294,7 @@ def execute_generate_profile_optimized_message(
     intent: str,
     context: str = "",
     include_trap_link: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Generate message optimized for target's psychology."""
     from holespawn.llm import call_llm
 
@@ -272,12 +313,12 @@ def execute_generate_profile_optimized_message(
 
 TARGET PROFILE:
 - Communication style: {style}
-- Interests: {', '.join(str(x) for x in interests)}
-- Vocabulary sample: {', '.join(str(x) for x in vocab)}
+- Interests: {", ".join(str(x) for x in interests)}
+- Vocabulary sample: {", ".join(str(x) for x in vocab)}
 
 YOUR INTENT: {intent}
 
-CONTEXT: {context or 'None'}
+CONTEXT: {context or "None"}
 
 Generate a message that:
 1. Matches their communication style and vocabulary
@@ -311,7 +352,7 @@ def execute_monitor_target_activity(
     target_id: int,
     platform: str,
     lookback_hours: int = 24,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Monitor recent target activity (stub: from stored data; extend with live API)."""
     target = _get_target(target_id)
     if not target:
@@ -333,7 +374,10 @@ def execute_monitor_target_activity(
         ]
     if platform in ("discord", "both") and raw.get("messages"):
         activity["recent_posts"] = activity["recent_posts"] + [
-            {"platform": "discord", "content": m.get("content", m) if isinstance(m, dict) else str(m)}
+            {
+                "platform": "discord",
+                "content": m.get("content", m) if isinstance(m, dict) else str(m),
+            }
             for m in (raw["messages"] or [])[:10]
         ]
 
@@ -346,7 +390,7 @@ def execute_track_engagement_response(
     target_id: int,
     engagement_type: str,
     message_id: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Track if target responded (stub: structure only)."""
     return {
         "target_id": target_id,
@@ -358,10 +402,11 @@ def execute_track_engagement_response(
     }
 
 
-def _json_load(s: Optional[str]) -> Any:
+def _json_load(s: str | None) -> Any:
     if s is None:
         return None
     import json
+
     try:
         return json.loads(s)
     except (TypeError, ValueError):

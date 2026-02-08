@@ -5,11 +5,11 @@ Iteration phases, framing by profile type, and message flow.
 
 # Iteration strategy: what the agent should focus on per phase
 ITERATION_PHASES = {
-    (1, 2): "recon",       # Profile and monitor activity
-    (3, 5): "rapport",     # Send rapport-building messages, no trap
-    (6, 8): "traps",       # Generate traps for responsive targets
-    (9, 12): "distribute", # Deploy and send trap links with framing
-    (13, 20): "iterate",   # Monitor, learn, scale
+    (1, 2): "recon",  # Profile and monitor activity
+    (3, 5): "rapport",  # Send rapport-building messages, no trap
+    (6, 8): "traps",  # Generate traps for responsive targets
+    (9, 12): "distribute",  # Deploy and send trap links with framing
+    (13, 20): "iterate",  # Monitor, learn, scale
 }
 
 

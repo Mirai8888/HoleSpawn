@@ -2,6 +2,7 @@
 Run autonomous agent from CLI.
   python -m holespawn.agent run --goal "..." --criteria '{}' --data operation_data.json
 """
+
 import sys
 from pathlib import Path
 

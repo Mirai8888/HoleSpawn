@@ -6,7 +6,7 @@ Returns ranked list of matching profiles for research/product understanding — 
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -54,9 +54,9 @@ def search_by_agenda(
     db_path: str | Path,
     *,
     limit: int = 20,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> list[dict[str, Any]]:
     """
@@ -65,6 +65,7 @@ def search_by_agenda(
     For research/product understanding only — no targeting.
     """
     from pathlib import Path
+
     path = Path(db_path)
     if path.is_dir():
         path = path / "holespawn.sqlite"
@@ -72,6 +73,7 @@ def search_by_agenda(
         return []
 
     import sqlite3
+
     with sqlite3.connect(str(path)) as conn:
         rows = conn.execute(
             """SELECT id, source_username, run_id, output_dir, behavioral_matrix, engagement_brief
@@ -91,7 +93,9 @@ def search_by_agenda(
 
     user_content = f"""Agenda (descriptive query):\n{agenda}\n\nProfile summaries:\n"""
     user_content += "\n---\n".join(summaries)
-    user_content += "\n\nOutput a JSON array of {run_id, rank, reason} for each profile, ordered by relevance."
+    user_content += (
+        "\n\nOutput a JSON array of {run_id, rank, reason} for each profile, ordered by relevance."
+    )
 
     try:
         raw = call_llm(
@@ -132,11 +136,13 @@ def search_by_agenda(
         if not run_id or run_id not in run_to_row:
             continue
         r = run_to_row[run_id]
-        result.append({
-            "run_id": run_id,
-            "output_dir": r[3],
-            "source_username": r[1],
-            "rank": item.get("rank", i + 1),
-            "reason": item.get("reason") or "",
-        })
+        result.append(
+            {
+                "run_id": run_id,
+                "output_dir": r[3],
+                "source_username": r[1],
+                "rank": item.get("rank", i + 1),
+                "reason": item.get("reason") or "",
+            }
+        )
     return result

@@ -4,7 +4,6 @@ Persist profiles and network reports to SQLite after run.
 
 import json
 from pathlib import Path
-from typing import Optional
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS profiles (
@@ -55,6 +54,7 @@ def init_db(db_path: str | Path) -> None:
     path = _db_path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     import sqlite3
+
     with sqlite3.connect(str(path)) as conn:
         conn.executescript(_SCHEMA)
         try:
@@ -80,7 +80,9 @@ def init_db(db_path: str | Path) -> None:
         except sqlite3.OperationalError:
             pass
         try:
-            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_canonical_handle ON profiles(canonical_handle)")
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_canonical_handle ON profiles(canonical_handle)"
+            )
             conn.commit()
         except sqlite3.OperationalError:
             pass
@@ -89,7 +91,7 @@ def init_db(db_path: str | Path) -> None:
 def store_profile(
     run_dir: str | Path,
     db_path: str | Path,
-) -> Optional[str]:
+) -> str | None:
     """
     Read behavioral_matrix.json, binding_protocol.md, metadata.json from run_dir
     and insert into profiles table. Returns run_id if stored, None if skipped (missing data).
@@ -119,6 +121,7 @@ def store_profile(
     canonical_handle = _normalize_handle(username)
 
     import sqlite3
+
     init_db(db_path)
     with sqlite3.connect(str(db_path)) as conn:
         conn.execute(
@@ -134,7 +137,16 @@ def store_profile(
                  created_at = excluded.created_at,
                  data_source = excluded.data_source
             """,
-            (username, canonical_handle, run_id, output_dir, matrix_text, engagement_brief, created_at, data_source),
+            (
+                username,
+                canonical_handle,
+                run_id,
+                output_dir,
+                matrix_text,
+                engagement_brief,
+                created_at,
+                data_source,
+            ),
         )
         conn.commit()
     return run_id
@@ -144,17 +156,19 @@ def store_network_report(
     run_id: str,
     output_dir: str | Path,
     report_json: str,
-    brief_text: Optional[str],
+    brief_text: str | None,
     db_path: str | Path,
     source: str = "file",
 ) -> None:
     """Insert a network analysis report and optional brief into network_reports."""
     from datetime import datetime
+
     db_path = _db_path(db_path)
     output_dir = str(Path(output_dir).resolve())
     created_at = datetime.utcnow().isoformat() + "Z"
 
     import sqlite3
+
     init_db(db_path)
     with sqlite3.connect(str(db_path)) as conn:
         conn.execute(

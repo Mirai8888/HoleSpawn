@@ -68,6 +68,7 @@ class ProfileCache:
             raise
         try:
             from loguru import logger
+
             logger.debug("Cached profile {}", key[:8])
         except ImportError:
             pass

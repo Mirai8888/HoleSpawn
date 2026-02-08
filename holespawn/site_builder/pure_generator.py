@@ -7,8 +7,9 @@ import html
 import json
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
@@ -83,15 +84,16 @@ For each page specify:
 - filename: e.g. "index.html", "specific_topic.html" (one must be "index.html" as entry point)
 - title: In their voice, using their vocabulary
 - topic: Specific concept from their world (not "AI" but "mesa-optimization in reward modeling")
-- content_type: article | feed | thread | gallery | custom (whatever fits)
+- content_type: article | feed | hub | gallery | thread — VARY THESE across the site. Do not make every page "article". Use feed for index or discovery/scroll-style pages; hub for topic hubs with many links; gallery for visual or card-heavy pages; thread for conversational or nested feels; article for long-form reads. Mix at least 2–3 different content_types across the 10–20 pages.
 - links_to: List of other page filenames this page should link to (3-8 per page)
-- hook: Why they would want to read this page
+- hook: Why they would want to read this page (short; used on hub/gallery cards)
 
 Rules:
 - Every page has 3-8 links_to (other filenames in your list)
 - No dead ends—always more to explore
 - Topics are SPECIFIC to their interests
 - Exactly one page must have filename "index.html"
+- Use a mix of content_type values so the site has structural variety (not all article)
 
 Return valid JSON only, no markdown or explanation:
 {
@@ -114,9 +116,9 @@ def generate_site_structure(
     profile: PsychologicalProfile,
     *,
     call_llm_fn: Callable[..., str] = call_llm,
-    tracker: Optional[CostTracker] = None,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
+    tracker: CostTracker | None = None,
+    provider: str | None = None,
+    model: str | None = None,
     calls_per_minute: int = 20,
 ) -> dict[str, Any]:
     """LLM designs entire site structure from profile. Returns {pages: [{filename, title, topic, content_type, links_to, hook}, ...]}."""
@@ -124,28 +126,28 @@ def generate_site_structure(
     user = f"""Here is EVERYTHING we know about this person:
 
 VOCABULARY (words they actually use):
-{', '.join(p['vocabulary_sample']) if p['vocabulary_sample'] else 'N/A'}
+{", ".join(p["vocabulary_sample"]) if p["vocabulary_sample"] else "N/A"}
 
 SAMPLE PHRASES (how they actually write):
-{json.dumps(p['sample_phrases'][:15])}
+{json.dumps(p["sample_phrases"][:15])}
 
-COMMUNICATION STYLE: {p['communication_style']}
-- Sentence structure: {p['sentence_structure']}
-- Emoji usage: {p['emoji_usage']}
+COMMUNICATION STYLE: {p["communication_style"]}
+- Sentence structure: {p["sentence_structure"]}
+- Emoji usage: {p["emoji_usage"]}
 
 INTERESTS & OBSESSIONS:
-- Topics: {', '.join(p['specific_interests']) if p['specific_interests'] else 'N/A'}
-- Obsessions: {', '.join(p['obsessions']) if p['obsessions'] else 'N/A'}
-- Pet peeves: {', '.join(p['pet_peeves']) if p['pet_peeves'] else 'N/A'}
+- Topics: {", ".join(p["specific_interests"]) if p["specific_interests"] else "N/A"}
+- Obsessions: {", ".join(p["obsessions"]) if p["obsessions"] else "N/A"}
+- Pet peeves: {", ".join(p["pet_peeves"]) if p["pet_peeves"] else "N/A"}
 
 BROWSING PATTERNS:
-- Style: {p['browsing_style']}
-- Content density: {p['content_density_preference']}
-- Visual preference: {p['visual_preference']}
+- Style: {p["browsing_style"]}
+- Content density: {p["content_density_preference"]}
+- Visual preference: {p["visual_preference"]}
 
-CULTURAL CONTEXT: {', '.join(p['cultural_references']) if p['cultural_references'] else 'N/A'}
+CULTURAL CONTEXT: {", ".join(p["cultural_references"]) if p["cultural_references"] else "N/A"}
 
-PSYCHOLOGY: Sentiment {p['sentiment_compound']:.2f}, Intensity {p['intensity']:.2f}
+PSYCHOLOGY: Sentiment {p["sentiment_compound"]:.2f}, Intensity {p["intensity"]:.2f}
 
 ---
 
@@ -222,12 +224,17 @@ REQUIRED CSS COVERAGE (you must include styles for all of these; the site HTML u
 - .layout-feed .feed, .feed-item, .feed-item h3, .feed-item a, .feed-item .preview, .feed-item .hook
 - .load-more, .load-more button
 - .layout-hub .hub-grid, .hub-card, .hub-card h3, .hub-card p
+- .layout-gallery .gallery, .layout-gallery .hub-grid, .layout-gallery .hub-card
+- .layout-feed .feed, .feed-item, .feed-item-title
+- .layout-thread .thread, .thread-item
 - .layout-article article, .layout-topic article, .layout-wiki article
 - article h1, .content, .content p, .content a
 - .see-also, .related, .see-also h3, .related h3, .see-also ul, .related ul, .see-also a, .related a
 - .infobox (optional; for wiki-style pages)
 
 LAYOUT SYSTEM: Derive from layout_style and browsing_style. "Scattered" or "chaotic" → asymmetric grid, varied gaps; "structured" or "balanced" → clear grid, consistent spacing; "flowing" → single column, generous line-height and margins. Express via grid-template-columns, gap, max-width, padding.
+
+STRUCTURAL DIVERSITY: Different pages use different body classes: .layout-article (classic article), .layout-feed (scroll/feed list), .layout-hub (grid of cards), .layout-gallery (visual card grid), .layout-thread (threaded/conversational). Style each layout DISTINCTLY so the site feels varied—different max-widths, grid vs single column, card styles, spacing. Avoid making every layout look like the same single-column article.
 
 Return ONLY valid CSS. No markdown, no comments, no explanation. Start with :root, then body, then elements. Use the exact class names above."""
 
@@ -237,9 +244,9 @@ def generate_design_system(
     spec: Any = None,
     *,
     call_llm_fn: Callable[..., str] = call_llm,
-    tracker: Optional[CostTracker] = None,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
+    tracker: CostTracker | None = None,
+    provider: str | None = None,
+    model: str | None = None,
     calls_per_minute: int = 20,
 ) -> str:
     """
@@ -277,22 +284,28 @@ def generate_design_system(
     ]
     # Discord context (when profile from Discord data)
     if p.get("tribal_affiliations") or p.get("reaction_triggers") or p.get("engagement_rhythm"):
-        user_parts.extend([
-            "",
-            "DISCORD CONTEXT (use for community vibe, pacing, intimacy):",
-            f"- Servers / tribal affiliations: {', '.join(p.get('tribal_affiliations', [])[:10]) or 'N/A'}",
-            f"- Reaction triggers (what resonates): {', '.join(p.get('reaction_triggers', [])[:8]) or 'N/A'}",
-            f"- Conversational intimacy: {p.get('conversational_intimacy', 'moderate')}, Community role: {p.get('community_role', 'participant')}",
-            f"- Engagement rhythm: {p.get('engagement_rhythm') or 'N/A'}",
-        ])
+        user_parts.extend(
+            [
+                "",
+                "DISCORD CONTEXT (use for community vibe, pacing, intimacy):",
+                f"- Servers / tribal affiliations: {', '.join(p.get('tribal_affiliations', [])[:10]) or 'N/A'}",
+                f"- Reaction triggers (what resonates): {', '.join(p.get('reaction_triggers', [])[:8]) or 'N/A'}",
+                f"- Conversational intimacy: {p.get('conversational_intimacy', 'moderate')}, Community role: {p.get('community_role', 'participant')}",
+                f"- Engagement rhythm: {p.get('engagement_rhythm') or 'N/A'}",
+            ]
+        )
     if spec is not None:
-        user_parts.extend([
-            "",
-            "EXPERIENCE SPEC (optional overrides):",
-            f"- Title/tone from spec; colors if set: primary {getattr(spec, 'color_primary', '')} secondary {getattr(spec, 'color_secondary', '')} accent {getattr(spec, 'color_accent', '')} background {getattr(spec, 'color_background', '')}",
-        ])
+        user_parts.extend(
+            [
+                "",
+                "EXPERIENCE SPEC (optional overrides):",
+                f"- Title/tone from spec; colors if set: primary {getattr(spec, 'color_primary', '')} secondary {getattr(spec, 'color_secondary', '')} accent {getattr(spec, 'color_accent', '')} background {getattr(spec, 'color_background', '')}",
+            ]
+        )
     user_parts.append("")
-    user_parts.append("Generate complete CSS. De-emphasize .back a; emphasize content and deeper links. Return only valid CSS.")
+    user_parts.append(
+        "Generate complete CSS. De-emphasize .back a; emphasize content and deeper links. Return only valid CSS."
+    )
     user = "\n".join(user_parts)
 
     raw = call_llm_fn(
@@ -312,9 +325,9 @@ def generate_css(
     profile: PsychologicalProfile,
     *,
     call_llm_fn: Callable[..., str] = call_llm,
-    tracker: Optional[CostTracker] = None,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
+    tracker: CostTracker | None = None,
+    provider: str | None = None,
+    model: str | None = None,
     calls_per_minute: int = 20,
 ) -> str:
     """LLM generates full CSS from profile. Delegates to generate_design_system (canonical)."""
@@ -352,29 +365,33 @@ def generate_page_content(
     all_pages: list[dict],
     *,
     call_llm_fn: Callable[..., str] = call_llm,
-    tracker: Optional[CostTracker] = None,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
+    tracker: CostTracker | None = None,
+    provider: str | None = None,
+    model: str | None = None,
     calls_per_minute: int = 20,
     min_links: int = 3,
     max_retries: int = 2,
 ) -> str:
     """LLM generates HTML body for one page with embedded links. Retries if link count < min_links (accept after max_retries)."""
     p = _profile_for_prompt(profile)
-    linkable = [f"{x['filename']} - {x.get('title', '')}" for x in all_pages if x.get("filename") != page_spec.get("filename")]
+    linkable = [
+        f"{x['filename']} - {x.get('title', '')}"
+        for x in all_pages
+        if x.get("filename") != page_spec.get("filename")
+    ]
     links_to = page_spec.get("links_to", [])[:8]
 
     user = f"""PAGE SPECS:
-Topic: {page_spec.get('topic', '')}
-Purpose/hook: {page_spec.get('hook', '')}
-Type: {page_spec.get('content_type', 'article')}
+Topic: {page_spec.get("topic", "")}
+Purpose/hook: {page_spec.get("hook", "")}
+Type: {page_spec.get("content_type", "article")}
 Must link to these filenames: {json.dumps(links_to)}
 
 TARGET PERSON:
-Writes like: {json.dumps(p['sample_phrases'][:10])}
-Uses words: {', '.join(p['vocabulary_sample'][:40]) if p['vocabulary_sample'] else 'N/A'}
-Cares about: {', '.join(p['obsessions'][:8]) if p['obsessions'] else 'N/A'}
-Style: {p['communication_style']}
+Writes like: {json.dumps(p["sample_phrases"][:10])}
+Uses words: {", ".join(p["vocabulary_sample"][:40]) if p["vocabulary_sample"] else "N/A"}
+Cares about: {", ".join(p["obsessions"][:8]) if p["obsessions"] else "N/A"}
+Style: {p["communication_style"]}
 
 AVAILABLE PAGES TO LINK TO (use exact filename in href):
 {json.dumps(linkable, indent=2)}
@@ -401,10 +418,23 @@ Write content in their voice. Embed at least 3 (ideally 5-8) <a href="filename.h
         if link_count >= min_links:
             return content
         if attempt < max_retries:
-            logger.warning("Page %s has %d links (min %d), retrying (%d/%d)...", page_spec.get("filename"), link_count, min_links, attempt + 1, max_retries + 1)
-            user += f"\n\nPREVIOUS ATTEMPT had only {link_count} links. You MUST include at least {min_links} <a href=\"...\"> links in the body."
+            logger.warning(
+                "Page %s has %d links (min %d), retrying (%d/%d)...",
+                page_spec.get("filename"),
+                link_count,
+                min_links,
+                attempt + 1,
+                max_retries + 1,
+            )
+            user += f'\n\nPREVIOUS ATTEMPT had only {link_count} links. You MUST include at least {min_links} <a href="..."> links in the body.'
         else:
-            logger.info("Page %s has %d links (min %d); accepting after %d attempts.", page_spec.get("filename"), link_count, min_links, max_retries + 1)
+            logger.info(
+                "Page %s has %d links (min %d); accepting after %d attempts.",
+                page_spec.get("filename"),
+                link_count,
+                min_links,
+                max_retries + 1,
+            )
     return content
 
 
@@ -433,24 +463,95 @@ def validate_site(structure: dict[str, Any], min_pages: int = 5) -> None:
         raise ValueError("Site validation failed:\n" + "\n".join(errors))
 
 
-def render_site(
-    pages: list[dict],
-    css: str,
-    output_dir: Path,
-) -> None:
-    """Write styles.css and one HTML file per page (breadcrumb, article, footer with time)."""
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "styles.css").write_text(css, encoding="utf-8")
+def _layout_body_class(content_type: str) -> str:
+    """Map content_type to body layout class for structural diversity."""
+    t = (content_type or "article").strip().lower()
+    if t in ("feed", "hub", "gallery", "thread"):
+        return f"layout-{t}"
+    return "layout-article"
 
-    for page in pages:
-        fn = page.get("filename", "page.html")
-        title = page.get("title", fn)
-        body_content = page.get("content", "")
-        if body_content and not body_content.strip().startswith("<"):
-            body_content = f"<p>{html.escape(body_content)}</p>"
+
+def _hub_cards_html(links_to: list[str], by_filename: dict) -> str:
+    """Generate .hub-grid with .hub-card for each links_to (title, hook from target page)."""
+    cards = []
+    for filename in links_to[:12]:
+        target = by_filename.get(filename)
+        if not target:
+            continue
+        title = target.get("title", filename)
+        hook = target.get("hook", "")
+        fn_esc = html.escape(filename, quote=True)
         title_esc = html.escape(title, quote=True)
-        html_str = f"""<!DOCTYPE html>
+        hook_esc = html.escape(hook, quote=True) if hook else ""
+        hook_p = f'<p class="hook">{hook_esc}</p>' if hook_esc else ""
+        cards.append(
+            f'<a class="hub-card" href="{fn_esc}" title="{hook_esc}">'
+            f"<h3>{title_esc}</h3>{hook_p}</a>"
+        )
+    if not cards:
+        return ""
+    return '<div class="hub-grid">' + "".join(cards) + "</div>"
+
+
+def _render_page_html(
+    page: dict,
+    pages: list[dict],
+    time_tracker_script: str,
+) -> str:
+    """Build full HTML for one page; layout varies by content_type."""
+    by_filename = {p.get("filename"): p for p in pages if p.get("filename")}
+    fn = page.get("filename", "page.html")
+    title = page.get("title", fn)
+    body_content = page.get("content", "")
+    if body_content and not body_content.strip().startswith("<"):
+        body_content = f"<p>{html.escape(body_content)}</p>"
+    title_esc = html.escape(title, quote=True)
+    content_type = page.get("content_type", "article")
+    layout_class = _layout_body_class(content_type)
+    links_to = page.get("links_to", [])
+
+    # Common head and nav
+    head_nav = """  <nav class="breadcrumbs">
+    <a class="back" href="index.html">↩</a>
+  </nav>"""
+
+    # Main content block varies by layout
+    if layout_class == "layout-feed":
+        main_inner = f"""  <main class="feed">
+    <div class="feed-item">
+      <h2 class="feed-item-title">{title_esc}</h2>
+      <div class="content">{body_content}</div>
+    </div>
+  </main>"""
+    elif layout_class == "layout-hub":
+        cards = _hub_cards_html(links_to, by_filename)
+        main_inner = f"""  <main class="site-main">
+    <header class="site-header"><h1>{title_esc}</h1></header>
+    <div class="content">{body_content}</div>
+    <section class="see-also">{cards}</section>
+  </main>"""
+    elif layout_class == "layout-gallery":
+        cards = _hub_cards_html(links_to, by_filename)
+        main_inner = f"""  <main class="site-main layout-gallery-main">
+    <header class="site-header"><h1>{title_esc}</h1></header>
+    <div class="content">{body_content}</div>
+    <div class="gallery">{cards}</div>
+  </main>"""
+    elif layout_class == "layout-thread":
+        main_inner = f"""  <main class="thread">
+    <div class="thread-item">
+      <h2>{title_esc}</h2>
+      <div class="content">{body_content}</div>
+    </div>
+  </main>"""
+    else:
+        # layout-article (default): classic article + content
+        main_inner = f"""  <article>
+    <h1>{title_esc}</h1>
+    <div class="content">{body_content}</div>
+  </article>"""
+
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -458,31 +559,44 @@ def render_site(
   <title>{title_esc}</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <nav class="breadcrumbs">
-    <a href="index.html">↩</a>
-  </nav>
-  <article>
-    <h1>{title_esc}</h1>
-    <div class="content">{body_content}</div>
-  </article>
+<body class="{layout_class}">
+{head_nav}
+{main_inner}
   <footer>
     <div class="time-tracker"><span id="time">00:00</span></div>
   </footer>
+{time_tracker_script}
+</body>
+</html>"""
+
+
+def render_site(
+    pages: list[dict],
+    css: str,
+    output_dir: Path,
+) -> None:
+    """Write styles.css and one HTML file per page. Structure varies by content_type (article, feed, hub, gallery, thread)."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "styles.css").write_text(css, encoding="utf-8")
+
+    time_tracker_script = """
   <script>
-    (function() {{
+    (function() {
       var start = Date.now();
-      setInterval(function() {{
+      setInterval(function() {
         var elapsed = Math.floor((Date.now() - start) / 1000);
         var m = Math.floor(elapsed / 60);
         var s = elapsed % 60;
         var el = document.getElementById('time');
         if (el) el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-      }}, 1000);
-    }})();
-  </script>
-</body>
-</html>"""
+      }, 1000);
+    })();
+  </script>"""
+
+    for page in pages:
+        fn = page.get("filename", "page.html")
+        html_str = _render_page_html(page, pages, time_tracker_script)
         (output_dir / fn).write_text(html_str, encoding="utf-8")
 
 
@@ -490,11 +604,11 @@ def generate_site_from_profile(
     profile: PsychologicalProfile,
     output_dir: Path,
     *,
-    content: Optional[SocialContent] = None,
+    content: SocialContent | None = None,
     call_llm_fn: Callable[..., str] = call_llm,
-    tracker: Optional[CostTracker] = None,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
+    tracker: CostTracker | None = None,
+    provider: str | None = None,
+    model: str | None = None,
     calls_per_minute: int = 20,
     skip_validation: bool = False,
 ) -> dict[str, Any]:

@@ -4,10 +4,8 @@ No rigid templates — page structure follows graph type (feed, hub, article).
 """
 
 import html
-import json
-import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from holespawn.experience import ExperienceSpec
 from holespawn.profile import PsychologicalProfile
@@ -26,7 +24,7 @@ def _render_feed_index(data: dict, spec: Any) -> str:
     items_html = []
     for i, it in enumerate(items):
         tit = _escape(it.get("title", f"Item {i + 1}"))
-        prev = _escape((it.get("preview", it.get("body", ""))[:200]))
+        prev = _escape(it.get("preview", it.get("body", ""))[:200])
         link = _escape(it.get("link", f"post_{i}.html"))
         hook = _escape(it.get("read_more_hook", "Read more"))
         items_html.append(

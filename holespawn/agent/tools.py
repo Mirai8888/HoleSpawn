@@ -13,7 +13,10 @@ FUNCTION_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "target_id": {"type": "integer", "description": "Target ID (must have raw_data)"},
+                    "target_id": {
+                        "type": "integer",
+                        "description": "Target ID (must have raw_data)",
+                    },
                     "use_nlp": {"type": "boolean", "default": True},
                     "use_llm": {"type": "boolean", "default": True},
                 },
@@ -70,7 +73,10 @@ FUNCTION_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "dir_path": {"type": "string", "description": "Path to directory of profile/behavioral_matrix JSONs"},
+                    "dir_path": {
+                        "type": "string",
+                        "description": "Path to directory of profile/behavioral_matrix JSONs",
+                    },
                     "name": {"type": "string", "description": "Network name"},
                 },
                 "required": ["dir_path"],
@@ -97,8 +103,15 @@ SOCIAL_ENGAGEMENT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "target_id": {"type": "integer", "description": "Target ID (must be profiled)"},
-                    "message": {"type": "string", "description": "Message content (sent via Discord bot)"},
-                    "include_trap_link": {"type": "boolean", "default": False, "description": "Include link to their personalized trap"},
+                    "message": {
+                        "type": "string",
+                        "description": "Message content (sent via Discord bot)",
+                    },
+                    "include_trap_link": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include link to their personalized trap",
+                    },
                     "framing": {
                         "type": "string",
                         "enum": ["mystery", "curiosity", "direct", "social_proof", "scarcity"],
@@ -120,7 +133,10 @@ SOCIAL_ENGAGEMENT_TOOLS = [
                     "target_id": {"type": "integer", "description": "Target ID (must be profiled)"},
                     "message": {"type": "string", "description": "Message content"},
                     "include_trap_link": {"type": "boolean", "default": False},
-                    "framing": {"type": "string", "enum": ["mystery", "curiosity", "direct", "social_proof", "scarcity"]},
+                    "framing": {
+                        "type": "string",
+                        "enum": ["mystery", "curiosity", "direct", "social_proof", "scarcity"],
+                    },
                 },
                 "required": ["target_id", "message"],
             },
@@ -152,7 +168,10 @@ SOCIAL_ENGAGEMENT_TOOLS = [
                 "properties": {
                     "channel_id": {"type": "string", "description": "Discord channel ID"},
                     "message": {"type": "string", "description": "Message content"},
-                    "reply_to_message_id": {"type": "string", "description": "Optional: ID of message to reply to"},
+                    "reply_to_message_id": {
+                        "type": "string",
+                        "description": "Optional: ID of message to reply to",
+                    },
                 },
                 "required": ["channel_id", "message"],
             },
@@ -167,8 +186,14 @@ SOCIAL_ENGAGEMENT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "target_id": {"type": "integer", "description": "Target ID (must be profiled)"},
-                    "intent": {"type": "string", "description": "What you want to achieve (e.g. build rapport, introduce trap, create curiosity)"},
-                    "context": {"type": "string", "description": "Conversation context or what triggered this message"},
+                    "intent": {
+                        "type": "string",
+                        "description": "What you want to achieve (e.g. build rapport, introduce trap, create curiosity)",
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Conversation context or what triggered this message",
+                    },
                     "include_trap_link": {"type": "boolean", "default": False},
                 },
                 "required": ["target_id", "intent"],
@@ -185,7 +210,11 @@ SOCIAL_ENGAGEMENT_TOOLS = [
                 "properties": {
                     "target_id": {"type": "integer", "description": "Target ID"},
                     "platform": {"type": "string", "enum": ["discord", "twitter", "both"]},
-                    "lookback_hours": {"type": "integer", "default": 24, "description": "How far back to look for activity"},
+                    "lookback_hours": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "How far back to look for activity",
+                    },
                 },
                 "required": ["target_id", "platform"],
             },

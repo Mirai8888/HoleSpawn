@@ -5,11 +5,10 @@ biases, shared mental processes, group-as-organism. For rabbit-hole spawning at
 group scale or product understanding. Analysis only — no botting, no campaigns.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.llm import call_llm
-
 
 NETWORK_BRIEF_SYSTEM = """You are an analyst producing a **network engagement brief**: vulnerability mapping for a whole group. The goal is to map the group's collective biases and mental processes almost as one organism. Uses include: rabbit-hole spawning for whole groups (personalized experiences at community scale), and product understanding (how a cohort thinks, what they trust, where they're susceptible).
 
@@ -45,9 +44,9 @@ Do not add preamble or meta-commentary. Output only the markdown document."""
 def get_network_engagement_brief(
     report: dict[str, Any],
     *,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> str:
     """
@@ -68,15 +67,25 @@ def get_network_engagement_brief(
             part += f" ... (+{len(c) - 30} more)"
         parts.append(part)
     central = report.get("central_accounts") or []
-    parts.append("\n## Central accounts (by degree centrality)\n" + ", ".join(str(x) for x in central[:25]))
+    parts.append(
+        "\n## Central accounts (by degree centrality)\n" + ", ".join(str(x) for x in central[:25])
+    )
     bet = report.get("betweenness_centrality")
     if bet:
-        part = "\n## Betweenness centrality (top)\n" + "\n".join(f"- {k}: {v}" for k, v in list(bet.items())[:15])
+        part = "\n## Betweenness centrality (top)\n" + "\n".join(
+            f"- {k}: {v}" for k, v in list(bet.items())[:15]
+        )
         parts.append(part)
     inf = report.get("influence_graph")
     if inf:
-        parts.append("\n## Influence graph\n" + f"Nodes: {len(inf.get('nodes') or [])}, Edges: {inf.get('edge_count', 0)}")
-    user_content = "Based on this network analysis report, output the network engagement brief (markdown only, no preamble).\n\n" + "\n".join(parts)
+        parts.append(
+            "\n## Influence graph\n"
+            + f"Nodes: {len(inf.get('nodes') or [])}, Edges: {inf.get('edge_count', 0)}"
+        )
+    user_content = (
+        "Based on this network analysis report, output the network engagement brief (markdown only, no preamble).\n\n"
+        + "\n".join(parts)
+    )
     return call_llm(
         NETWORK_BRIEF_SYSTEM,
         user_content,

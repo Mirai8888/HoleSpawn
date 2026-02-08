@@ -4,9 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
-from holespawn.network import NetworkAnalyzer, load_profiles_from_dir, load_edges_file
+from holespawn.network import NetworkAnalyzer, load_edges_file, load_profiles_from_dir
 
 
 def test_load_profiles_from_dir_empty():

@@ -6,7 +6,7 @@ Supports local models via OpenAI-compatible API (api_base + model).
 import json
 import os
 import re
-from typing import Any, Callable, Optional
+from typing import Any
 
 from holespawn.config import get_llm_config
 from holespawn.cost_tracker import CostTracker
@@ -55,9 +55,9 @@ class DiscordLLMSynthesizer:
 
     def __init__(
         self,
-        api_base: Optional[str] = None,
-        model: Optional[str] = None,
-        preset: Optional[str] = None,
+        api_base: str | None = None,
+        model: str | None = None,
+        preset: str | None = None,
     ):
         if preset:
             config = get_llm_config(preset=preset)
@@ -68,7 +68,7 @@ class DiscordLLMSynthesizer:
             self.model = model or os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
         self.preset = preset
 
-    def _call(self, system: str, user: str, tracker: Optional[CostTracker] = None) -> str:
+    def _call(self, system: str, user: str, tracker: CostTracker | None = None) -> str:
         kwargs = {}
         if self.api_base:
             kwargs["api_base_override"] = self.api_base
@@ -87,7 +87,7 @@ class DiscordLLMSynthesizer:
         self,
         nlp_analysis: dict,
         raw_samples: dict,
-        tracker: Optional[CostTracker] = None,
+        tracker: CostTracker | None = None,
     ) -> dict[str, Any]:
         """
         LLM interprets NLP metrics + raw samples → psychological profile.
@@ -114,7 +114,7 @@ Output the JSON only."""
         self,
         server_analysis: dict,
         message_samples: dict,
-        tracker: Optional[CostTracker] = None,
+        tracker: CostTracker | None = None,
     ) -> dict[str, Any]:
         """LLM analyzes server affiliations + tribal markers → community psychology."""
         user = f"""Server/community analysis:
@@ -135,7 +135,7 @@ Output JSON: {"tribal_themes": ["theme1", "theme2"], "community_values": ["value
         self,
         psychology: dict,
         nlp_metrics: dict,
-        tracker: Optional[CostTracker] = None,
+        tracker: CostTracker | None = None,
     ) -> dict[str, Any]:
         """LLM combines psychology + NLP patterns → specific personalization strategies for design and content."""
         user = f"""Psychology: {json.dumps(psychology)[:2000]}

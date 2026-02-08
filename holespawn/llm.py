@@ -4,17 +4,17 @@ Supports local models via OpenAI-compatible API (api_base + model).
 """
 
 import os
-from typing import Any, Callable, Optional
+from typing import Any
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.utils import rate_limit, retry_with_backoff
 
 
 def get_provider_and_key(
-    provider_override: Optional[str] = None,
-    api_base_override: Optional[str] = None,
-    model_override: Optional[str] = None,
-) -> tuple[str, str, Optional[str], Optional[str]]:
+    provider_override: str | None = None,
+    api_base_override: str | None = None,
+    model_override: str | None = None,
+) -> tuple[str, str, str | None, str | None]:
     """
     Resolve provider, API key, model, and optional api_base.
     Returns (provider, api_key, model, api_base).
@@ -29,12 +29,21 @@ def get_provider_and_key(
     prov = "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "openai"
     if not os.getenv("ANTHROPIC_API_KEY") and os.getenv("OPENAI_API_KEY"):
         prov = "openai"
-    if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OPENAI_API_KEY") and (
-        os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if (
+        not os.getenv("ANTHROPIC_API_KEY")
+        and not os.getenv("OPENAI_API_KEY")
+        and (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"))
     ):
         prov = "google"
 
-    if provider_override and str(provider_override).lower() in ("anthropic", "claude", "openai", "google", "gemini", "openai_compatible"):
+    if provider_override and str(provider_override).lower() in (
+        "anthropic",
+        "claude",
+        "openai",
+        "google",
+        "gemini",
+        "openai_compatible",
+    ):
         p = str(provider_override).lower()
         if p == "openai_compatible" and api_base:
             pass  # already set above
@@ -90,6 +99,7 @@ def _call_anthropic(
     max_tokens: int,
 ) -> tuple[str, int, int]:
     import anthropic
+
     client = anthropic.Anthropic(api_key=api_key)
     resp = client.messages.create(
         model=model,
@@ -108,9 +118,10 @@ def _call_openai(
     api_key: str,
     model: str,
     max_tokens: int,
-    base_url: Optional[str] = None,
+    base_url: str | None = None,
 ) -> tuple[str, int, int]:
     from openai import OpenAI
+
     kwargs = {"api_key": api_key or "ollama"}
     if base_url:
         kwargs["base_url"] = base_url
@@ -134,7 +145,7 @@ def _call_openai_compatible(
     api_base: str,
     model: str,
     max_tokens: int,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> tuple[str, int, int]:
     """Local or custom OpenAI-compatible endpoint (Ollama, LM Studio, vLLM)."""
     return _call_openai(
@@ -150,9 +161,11 @@ def _call_google(
     max_tokens: int,
 ) -> tuple[str, int, int]:
     from google import genai  # type: ignore
+
     # Request timeout (ms): avoid indefinite hang; structure generation can take 1–2 min
     try:
         from google.genai.types import HttpOptions
+
         client = genai.Client(api_key=api_key, http_options=HttpOptions(timeout=180_000))
     except (ImportError, TypeError):
         client = genai.Client(api_key=api_key)
@@ -174,7 +187,7 @@ def _call_llm_once(
     api_key: str,
     model: str,
     max_tokens: int,
-    api_base: Optional[str] = None,
+    api_base: str | None = None,
 ) -> tuple[str, int, int]:
     if provider == "openai_compatible" and api_base:
         return _call_openai_compatible(system, user_content, api_base, model, max_tokens, api_key)
@@ -205,12 +218,12 @@ def call_llm(
     system: str,
     user_content: str,
     *,
-    provider_override: Optional[str] = None,
-    model_override: Optional[str] = None,
-    api_base_override: Optional[str] = None,
+    provider_override: str | None = None,
+    model_override: str | None = None,
+    api_base_override: str | None = None,
     max_tokens: int = 4096,
     operation: str = "",
-    tracker: Optional[CostTracker] = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> str:
     """

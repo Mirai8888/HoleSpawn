@@ -3,14 +3,15 @@ Evaluate success criteria for autonomous operations.
 Tracks conversion rates: DM sent → response, trap link → visit, visit → high effectiveness.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
-def get_operation_state() -> Dict[str, Any]:
+def get_operation_state() -> dict[str, Any]:
     """Gather current state from dashboard for evaluation."""
     try:
         from dashboard.db import get_db
         from dashboard.db import operations as ops
+
         with get_db() as db:
             targets = ops.list_targets(db, limit=500)
             traps = ops.list_traps(db, limit=500)
@@ -36,30 +37,38 @@ def get_operation_state() -> Dict[str, Any]:
 
 
 def evaluate_success_criteria(
-    criteria: Dict[str, Any],
-    state: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    criteria: dict[str, Any],
+    state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Evaluate whether success criteria are met.
     criteria: e.g. min_effectiveness, min_successful_traps, min_engagement_response_rate, min_trap_conversion_rate
     Returns: { "met": bool, "details": { criterion: { "required", "actual", "met" } }, "state": {...} }
     """
     state = state or get_operation_state()
-    details: Dict[str, Dict[str, Any]] = {}
+    details: dict[str, dict[str, Any]] = {}
     all_met = True
     has_any_criteria = False
 
     min_effectiveness = criteria.get("min_effectiveness")
     if min_effectiveness is not None:
         traps_70 = state.get("traps_70_plus", 0)
-        details["min_effectiveness"] = {"required": f"traps with effectiveness >= {min_effectiveness}", "actual": traps_70, "met": traps_70 >= (criteria.get("min_successful_traps") or 1)}
+        details["min_effectiveness"] = {
+            "required": f"traps with effectiveness >= {min_effectiveness}",
+            "actual": traps_70,
+            "met": traps_70 >= (criteria.get("min_successful_traps") or 1),
+        }
 
     min_successful_traps = criteria.get("min_successful_traps")
     if min_successful_traps is not None:
         has_any_criteria = True
         n = state.get("traps_70_plus", 0)
         met = n >= min_successful_traps
-        details["min_successful_traps"] = {"required": min_successful_traps, "actual": n, "met": met}
+        details["min_successful_traps"] = {
+            "required": min_successful_traps,
+            "actual": n,
+            "met": met,
+        }
         if not met:
             all_met = False
 
@@ -70,7 +79,11 @@ def evaluate_success_criteria(
         responded = state.get("targets_responded", 0)  # TODO: from Engagement.target_responded
         rate = responded / dms
         met = rate >= min_engagement_response_rate
-        details["min_engagement_response_rate"] = {"required": min_engagement_response_rate, "actual": round(rate, 2), "met": met}
+        details["min_engagement_response_rate"] = {
+            "required": min_engagement_response_rate,
+            "actual": round(rate, 2),
+            "met": met,
+        }
         if not met:
             all_met = False
 
@@ -81,7 +94,11 @@ def evaluate_success_criteria(
         visited = state.get("trap_visits_from_link", state.get("traps_active", 0))
         rate = visited / links_sent
         met = rate >= min_trap_conversion_rate
-        details["min_trap_conversion_rate"] = {"required": min_trap_conversion_rate, "actual": round(rate, 2), "met": met}
+        details["min_trap_conversion_rate"] = {
+            "required": min_trap_conversion_rate,
+            "actual": round(rate, 2),
+            "met": met,
+        }
         if not met:
             all_met = False
 

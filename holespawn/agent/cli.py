@@ -17,7 +17,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     """Run autonomous operation."""
     from holespawn.agent.autonomous import AutonomousOperator
 
-    goal = args.goal or "Profile targets, engage via DM to build rapport, deploy traps, achieve 70+ effectiveness on at least 3 targets."
+    goal = (
+        args.goal
+        or "Profile targets, engage via DM to build rapport, deploy traps, achieve 70+ effectiveness on at least 3 targets."
+    )
     criteria = {}
     if args.criteria:
         try:
@@ -40,6 +43,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     if args.model:
         import os
+
         os.environ["LLM_MODEL"] = args.model
 
     operator = AutonomousOperator(
@@ -62,10 +66,18 @@ def main() -> int:
 
     run_p = sub.add_parser("run", help="Run autonomous operation")
     run_p.add_argument("--goal", "-g", help="Operational goal")
-    run_p.add_argument("--criteria", "-c", help="Success criteria as JSON, e.g. {\"min_effectiveness\": 70, \"min_successful_traps\": 3}")
-    run_p.add_argument("--data", "-d", help="Path to operation_data.json (targets, platform, exports)")
+    run_p.add_argument(
+        "--criteria",
+        "-c",
+        help='Success criteria as JSON, e.g. {"min_effectiveness": 70, "min_successful_traps": 3}',
+    )
+    run_p.add_argument(
+        "--data", "-d", help="Path to operation_data.json (targets, platform, exports)"
+    )
     run_p.add_argument("--model", "-m", help="LLM model (claude, gpt-4, or model name)")
-    run_p.add_argument("--max-iterations", "-n", type=int, default=20, help="Max iterations (default 20)")
+    run_p.add_argument(
+        "--max-iterations", "-n", type=int, default=20, help="Max iterations (default 20)"
+    )
     run_p.set_defaults(func=cmd_run)
 
     parsed = ap.parse_args()

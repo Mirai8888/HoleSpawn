@@ -4,14 +4,11 @@ framework to shape or steer a person via narrative. Vulnerability map, contact s
 phased engagement sequence.
 """
 
-from typing import Optional
-
 from holespawn.context import build_context
 from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
 from holespawn.llm import call_llm
 from holespawn.profile import PsychologicalProfile
-
 
 ENGAGEMENT_SYSTEM = """You are an analyst producing a **narrative engineering** brief. The goal is to profile one person so they can be shaped or steered through narrative — i.e. what stories, information flows, and social dynamics will move them toward desired beliefs, actions, or roles.
 
@@ -55,9 +52,9 @@ def get_engagement_brief(
     content: SocialContent,
     profile: PsychologicalProfile,
     *,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> str:
     """
@@ -65,7 +62,10 @@ def get_engagement_brief(
     Requires ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY.
     """
     context = build_context(content, profile)
-    user_content = "Based on this profile and narrative, output the engagement brief (markdown only, no preamble).\n\n" + context
+    user_content = (
+        "Based on this profile and narrative, output the engagement brief (markdown only, no preamble).\n\n"
+        + context
+    )
     return call_llm(
         ENGAGEMENT_SYSTEM,
         user_content,
@@ -87,7 +87,13 @@ def _profile_dict_to_context(profile: dict) -> str:
     else:
         theme_str = ", ".join(str(t) for t in themes[:25])
     lines.append(f"Themes: {theme_str}")
-    for key in ("sentiment_compound", "sentiment_positive", "sentiment_negative", "sentiment_neutral", "intensity"):
+    for key in (
+        "sentiment_compound",
+        "sentiment_positive",
+        "sentiment_negative",
+        "sentiment_neutral",
+        "intensity",
+    ):
         val = profile.get(key)
         if val is not None:
             lines.append(f"{key}: {val}")
@@ -95,7 +101,9 @@ def _profile_dict_to_context(profile: dict) -> str:
     lines.append(f"Vocabulary sample: {', '.join((profile.get('vocabulary_sample') or [])[:25])}")
     lines.append(f"Specific interests: {', '.join((profile.get('specific_interests') or [])[:12])}")
     lines.append(f"Obsessions: {', '.join((profile.get('obsessions') or [])[:10])}")
-    lines.append(f"Cultural references: {', '.join((profile.get('cultural_references') or [])[:10])}")
+    lines.append(
+        f"Cultural references: {', '.join((profile.get('cultural_references') or [])[:10])}"
+    )
     if profile.get("sample_phrases"):
         lines.append("Sample phrases:")
         for p in (profile["sample_phrases"] or [])[:15]:
@@ -108,9 +116,9 @@ def _profile_dict_to_context(profile: dict) -> str:
 def get_engagement_brief_from_profile(
     profile_dict: dict,
     *,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> str:
     """
@@ -118,7 +126,10 @@ def get_engagement_brief_from_profile(
     Use for repair when the vulnerability map is missing or invalid.
     """
     context = _profile_dict_to_context(profile_dict)
-    user_content = "Based on this profile only (no raw narrative), output the engagement brief (markdown only, no preamble).\n\n" + context
+    user_content = (
+        "Based on this profile only (no raw narrative), output the engagement brief (markdown only, no preamble).\n\n"
+        + context
+    )
     return call_llm(
         ENGAGEMENT_SYSTEM,
         user_content,

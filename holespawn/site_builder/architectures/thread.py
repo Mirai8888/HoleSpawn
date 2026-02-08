@@ -3,13 +3,14 @@ Thread architecture: nested discussion / thread_reader style.
 Falls back to hub-spoke with thread-like styling for now.
 """
 
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from holespawn.experience import ExperienceSpec
 from holespawn.ingest import SocialContent
 from holespawn.profile import PsychologicalProfile
 
-from .base import BaseArchitecture, ArchitectureConfig
+from .base import ArchitectureConfig, BaseArchitecture
 from .hub_spoke import HubSpokeArchitecture
 
 
@@ -28,15 +29,17 @@ class ThreadArchitecture(BaseArchitecture):
         call_llm: Callable[..., str],
         context_str: str,
         voice_guide: str,
-        tracker: Optional[Any] = None,
-        provider: Optional[str] = None,
-        model: Optional[str] = None,
+        tracker: Any | None = None,
+        provider: str | None = None,
+        model: str | None = None,
         calls_per_minute: int = 20,
     ) -> dict[str, dict[str, Any]]:
         """Build thread-style graph (hub + topic pages with "thread" type for styling)."""
         hub = HubSpokeArchitecture()
         graph = hub.build_content_graph(
-            profile, content, spec,
+            profile,
+            content,
+            spec,
             call_llm=call_llm,
             context_str=context_str,
             voice_guide=voice_guide,

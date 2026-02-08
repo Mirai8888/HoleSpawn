@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-from .analyzer import NetworkAnalyzer, load_profiles_from_dir, load_edges_file
+from .analyzer import NetworkAnalyzer, load_edges_file, load_profiles_from_dir
 from .apify_network import fetch_profiles_via_apify
 from .brief import get_network_engagement_brief
 
@@ -48,7 +48,8 @@ def main() -> None:
         help="Optional CSV or JSON file with source,target edges (follow graph).",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default=None,
         help="Write report JSON here. Default: stdout.",
@@ -106,13 +107,17 @@ def main() -> None:
             sys.stderr.write(f"[holespawn] error: Apify failed: {e}\n")
             sys.exit(1)
         if not profiles:
-            sys.stderr.write("[holespawn] error: no profiles from Apify (check APIFY_API_TOKEN and --apify username)\n")
+            sys.stderr.write(
+                "[holespawn] error: no profiles from Apify (check APIFY_API_TOKEN and --apify username)\n"
+            )
             sys.exit(1)
     elif args.profiles_dir and Path(args.profiles_dir).is_dir():
         profiles_dir = Path(args.profiles_dir)
         profiles = load_profiles_from_dir(profiles_dir)
         if not profiles:
-            sys.stderr.write("[holespawn] error: no behavioral_matrix.json or profile.json found under dir\n")
+            sys.stderr.write(
+                "[holespawn] error: no behavioral_matrix.json or profile.json found under dir\n"
+            )
             sys.exit(1)
     else:
         sys.stderr.write("[holespawn] error: provide profiles_dir or --apify USERNAME\n")
@@ -133,6 +138,7 @@ def main() -> None:
         if not args.no_brief:
             try:
                 from holespawn.cost_tracker import CostTracker
+
                 tracker = CostTracker(
                     warn_threshold=float(os.getenv("COST_WARN_THRESHOLD", "1")),
                     max_cost=float(os.getenv("COST_MAX_THRESHOLD", "5")),
@@ -140,19 +146,25 @@ def main() -> None:
                 brief_text = get_network_engagement_brief(report, tracker=tracker)
                 brief_path = Path(args.output).parent / "network_engagement_brief.md"
                 brief_path.write_text(brief_text, encoding="utf-8")
-                sys.stderr.write(f"  network_engagement_brief.md\n")
+                sys.stderr.write("  network_engagement_brief.md\n")
                 tracker.save_to_file(Path(args.output).parent)
                 cost = tracker.get_cost()
-                sys.stderr.write(f"  Network brief cost: ${cost:.4f} ({tracker.input_tokens:,} in / {tracker.output_tokens:,} out tokens)\n")
+                sys.stderr.write(
+                    f"  Network brief cost: ${cost:.4f} ({tracker.input_tokens:,} in / {tracker.output_tokens:,} out tokens)\n"
+                )
             except Exception as e:
                 sys.stderr.write(f"[holespawn] error: network brief failed: {e}\n")
         if args.db:
             try:
-                from holespawn.db import store_network_report, init_db
                 from datetime import datetime
+
+                from holespawn.db import init_db, store_network_report
+
                 db_path = Path(args.db)
                 init_db(db_path)
-                run_id = f"network_{Path(args.output).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                run_id = (
+                    f"network_{Path(args.output).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                )
                 store_network_report(
                     run_id=run_id,
                     output_dir=Path(args.output).parent,

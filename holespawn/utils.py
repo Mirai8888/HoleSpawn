@@ -3,14 +3,16 @@ Retry with backoff and rate limiting for API calls.
 """
 
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 F = TypeVar("F", bound=Callable)
 
 
 def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
     """Decorator: exponential backoff retry on exception."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -22,9 +24,10 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
                     last_exc = e
                     if attempt == max_retries - 1:
                         raise
-                    delay = base_delay * (2 ** attempt)
+                    delay = base_delay * (2**attempt)
                     try:
                         from loguru import logger
+
                         logger.warning(
                             "Attempt {}/{} failed, retrying in {:.1f}s: {}",
                             attempt + 1,
@@ -36,7 +39,9 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
                         pass
                     time.sleep(delay)
             raise last_exc  # type: ignore
+
         return wrapper  # type: ignore
+
     return decorator
 
 
@@ -55,5 +60,7 @@ def rate_limit(calls_per_minute: float = 20):
             result = func(*args, **kwargs)
             last_called[0] = time.time()
             return result
+
         return wrapper  # type: ignore
+
     return decorator

@@ -4,13 +4,14 @@ Hub-spoke architecture: central hub with topic cards and topic pages (scanner de
 
 import json
 import re
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from holespawn.experience import ExperienceSpec
 from holespawn.ingest import SocialContent
 from holespawn.profile import PsychologicalProfile
 
-from .base import BaseArchitecture, ArchitectureConfig
+from .base import ArchitectureConfig, BaseArchitecture
 
 
 def _slug(s: str) -> str:
@@ -49,9 +50,9 @@ class HubSpokeArchitecture(BaseArchitecture):
         call_llm: Callable[..., str],
         context_str: str,
         voice_guide: str,
-        tracker: Optional[Any] = None,
-        provider: Optional[str] = None,
-        model: Optional[str] = None,
+        tracker: Any | None = None,
+        provider: str | None = None,
+        model: str | None = None,
         calls_per_minute: int = 20,
     ) -> dict[str, dict[str, Any]]:
         """Build hub: index (cards) + topic pages with content containing <a href>."""
@@ -69,7 +70,7 @@ class HubSpokeArchitecture(BaseArchitecture):
 Profile (excerpt):
 {context_str[:10000]}
 
-TASK: Hub-spoke site. Topics (one page each): {', '.join(topics)}. Slugs for hrefs: {', '.join(available)}
+TASK: Hub-spoke site. Topics (one page each): {", ".join(topics)}. Slugs for hrefs: {", ".join(available)}
 
 For each topic return in "topic_pages": title, body (HTML with <p> and at least 3 <a href="slug.html">...</a>), related (3-5 other slugs).
 Also index_title, index_tagline, cards (id=slug, title, description).
@@ -112,12 +113,20 @@ Output JSON:
             c["title"] = c.get("title", topics[j] if j < len(topics) else sid)
             c["description"] = c.get("description", "")
 
-        graph["index"] = {"type": "hub", "title": index_title, "tagline": index_tagline, "cards": cards}
+        graph["index"] = {
+            "type": "hub",
+            "title": index_title,
+            "tagline": index_tagline,
+            "cards": cards,
+        }
 
         for j, tp in enumerate(topic_pages[: len(cards)]):
             slug = _slug(cards[j].get("id", slugs[j]))
             related = tp.get("related", [])
-            related_links = [{"href": f"{_slug(r)}.html", "title": str(r).replace("_", " ").title()} for r in related[:6]]
+            related_links = [
+                {"href": f"{_slug(r)}.html", "title": str(r).replace("_", " ").title()}
+                for r in related[:6]
+            ]
             graph[slug] = {
                 "type": "article",
                 "title": tp.get("title", cards[j].get("title", slug)),

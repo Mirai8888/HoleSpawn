@@ -20,21 +20,25 @@ except ImportError:
 # Optional: spaCy for linguistic analysis (lazy load to avoid import-time failure)
 _nlp_spacy = None
 
+
 def _get_spacy():
     global _nlp_spacy
     if _nlp_spacy is not None:
         return _nlp_spacy
     try:
         import spacy
+
         _nlp_spacy = spacy.load("en_core_web_sm")
     except Exception:
         pass
     return _nlp_spacy
 
+
 # Optional: NLTK for lexical
 try:
     import nltk
-    from nltk.tokenize import word_tokenize, sent_tokenize
+    from nltk.tokenize import sent_tokenize, word_tokenize
+
     try:
         nltk.data.find("tokenizers/punkt")
     except LookupError:
@@ -45,8 +49,8 @@ except ImportError:
 
 # Optional: sklearn for clustering / patterns
 try:
-    from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.decomposition import NMF
+    from sklearn.feature_extraction.text import TfidfVectorizer
 except ImportError:
     TfidfVectorizer = None
     NMF = None
@@ -71,11 +75,63 @@ def _sent_tokenize_simple(text: str) -> list[str]:
 def _content_words() -> set[str]:
     """Simple content-word heuristic (no NLTK)."""
     stop = {
-        "i", "me", "my", "we", "our", "you", "your", "he", "she", "it", "they", "them",
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has",
-        "had", "do", "does", "did", "will", "would", "could", "should", "may", "might",
-        "can", "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "this",
-        "that", "and", "but", "or", "if", "then", "so", "just", "not", "no", "yes",
+        "i",
+        "me",
+        "my",
+        "we",
+        "our",
+        "you",
+        "your",
+        "he",
+        "she",
+        "it",
+        "they",
+        "them",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "this",
+        "that",
+        "and",
+        "but",
+        "or",
+        "if",
+        "then",
+        "so",
+        "just",
+        "not",
+        "no",
+        "yes",
     }
     return stop
 
@@ -109,7 +165,9 @@ class DiscordNLPAnalyzer:
         # Lexical
         type_token = len(set(tokens)) / len(tokens) if tokens else 0.0
         avg_word_len = sum(len(w) for w in tokens) / len(tokens) if tokens else 0.0
-        avg_sent_len = sum(len(_tokenize_simple(s)) for s in sentences) / len(sentences) if sentences else 0.0
+        avg_sent_len = (
+            sum(len(_tokenize_simple(s)) for s in sentences) / len(sentences) if sentences else 0.0
+        )
         stop = _content_words()
         content_count = sum(1 for w in tokens if w not in stop)
         lexical_density = content_count / len(tokens) if tokens else 0.0
@@ -129,11 +187,19 @@ class DiscordNLPAnalyzer:
             sentiment_dist["positive"] /= n
             sentiment_dist["negative"] /= n
             sentiment_dist["neutral"] /= n
-        emotional_range = float((max(compounds) - min(compounds))) if compounds else 0.0
+        emotional_range = float(max(compounds) - min(compounds)) if compounds else 0.0
 
         # Discourse markers (regex)
-        hedging = sum(1 for c in contents if re.search(r"\b(maybe|kinda|sort of|perhaps|probably|imo|tbh|idk)\b", c.lower()))
-        certainty = sum(1 for c in contents if re.search(r"\b(definitely|obviously|clearly|actually|literally)\b", c.lower()))
+        hedging = sum(
+            1
+            for c in contents
+            if re.search(r"\b(maybe|kinda|sort of|perhaps|probably|imo|tbh|idk)\b", c.lower())
+        )
+        certainty = sum(
+            1
+            for c in contents
+            if re.search(r"\b(definitely|obviously|clearly|actually|literally)\b", c.lower())
+        )
         questions = sum(1 for c in contents if "?" in c)
         exclamations = sum(1 for c in contents if "!" in c)
         n = len(contents) or 1
@@ -230,6 +296,7 @@ class DiscordNLPAnalyzer:
         probs = [c / total for c in emoji_counts.values()]
         try:
             import math
+
             reaction_diversity = -sum(p * math.log(p) for p in probs if p > 0) if probs else 0.0
         except Exception:
             reaction_diversity = float(len(emoji_counts)) / 10.0  # fallback
@@ -250,9 +317,7 @@ class DiscordNLPAnalyzer:
             "reciprocity_score": 0.0,  # would need "reactions received" data
         }
 
-    def analyze_servers(
-        self, servers: list[dict], messages: list[dict]
-    ) -> dict[str, Any]:
+    def analyze_servers(self, servers: list[dict], messages: list[dict]) -> dict[str, Any]:
         """Community affiliation analysis."""
         server_names: list[str] = []
         for s in servers or []:

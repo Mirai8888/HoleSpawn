@@ -18,6 +18,7 @@ except ImportError:
 
 class CostExceededError(Exception):
     """Raised when estimated cost exceeds max_cost and abort_on_max is True."""
+
     def __init__(self, current: float, max_cost: float):
         self.current = current
         self.max_cost = max_cost
@@ -53,6 +54,7 @@ def check_pricing_freshness() -> None:
         if days_old > 90:
             try:
                 from loguru import logger
+
                 logger.warning(
                     "LLM pricing data is {} days old and may be inaccurate. "
                     "Check for updates or set a pricing config file.",
@@ -88,7 +90,7 @@ def _normalize_model(name: str, pricing: dict[str, tuple[float, float]]) -> str:
     for key in pricing:
         if key in name or name in key:
             return key
-    return "gemini-2.5-flash"  # fallback
+    return "claude-sonnet-4-20250514"  # fallback
 
 
 def _float_env(name: str, default: float) -> float:
@@ -106,7 +108,7 @@ class CostTracker:
 
     def __init__(
         self,
-        model: str = "gemini-flash",
+        model: str = "claude-sonnet-4-20250514",
         warn_threshold: float | None = None,
         max_cost: float | None = None,
         abort_on_max: bool = False,
@@ -116,7 +118,11 @@ class CostTracker:
         self.pricing = load_pricing(pricing_config)
         self._pricing_key = _normalize_model(model, self.pricing)
         check_pricing_freshness()
-        self.warn_threshold = warn_threshold if warn_threshold is not None else _float_env("COST_WARN_THRESHOLD", 1.00)
+        self.warn_threshold = (
+            warn_threshold
+            if warn_threshold is not None
+            else _float_env("COST_WARN_THRESHOLD", 1.00)
+        )
         self.max_cost = max_cost if max_cost is not None else _float_env("COST_MAX_THRESHOLD", 5.00)
         if self.warn_threshold > self.max_cost:
             raise ValueError(
@@ -138,16 +144,19 @@ class CostTracker:
     ) -> None:
         self.input_tokens += input_tokens
         self.output_tokens += output_tokens
-        self.calls.append({
-            "operation": operation,
-            "input": input_tokens,
-            "output": output_tokens,
-            "timestamp": datetime.now().isoformat(),
-        })
+        self.calls.append(
+            {
+                "operation": operation,
+                "input": input_tokens,
+                "output": output_tokens,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
         cost = self.get_cost()
         if cost > self.warn_threshold:
             try:
                 from loguru import logger
+
                 logger.warning(
                     "Cost exceeded ${:.2f} threshold (current: ${:.4f})",
                     self.warn_threshold,
@@ -158,6 +167,7 @@ class CostTracker:
         if cost > self.max_cost:
             try:
                 from loguru import logger
+
                 logger.error(
                     "Cost exceeded max ${:.2f} (current: ${:.4f}). Consider stopping.",
                     self.max_cost,
@@ -171,12 +181,11 @@ class CostTracker:
     def get_cost(self) -> float:
         prices = self.pricing.get(
             self._pricing_key,
-            self.pricing.get("gemini-2.5-flash", (0.15, 0.60)),
+            self.pricing.get("claude-sonnet-4-20250514", (3.00, 15.00)),
         )
         input_cost, output_cost = prices
-        return (
-            (self.input_tokens * input_cost / 1_000_000)
-            + (self.output_tokens * output_cost / 1_000_000)
+        return (self.input_tokens * input_cost / 1_000_000) + (
+            self.output_tokens * output_cost / 1_000_000
         )
 
     def print_summary(self) -> None:
@@ -203,6 +212,7 @@ class CostTracker:
             json.dump(data, f, indent=2)
         try:
             from loguru import logger
+
             logger.debug("Saved cost breakdown to {}", path)
         except ImportError:
             pass

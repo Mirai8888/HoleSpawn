@@ -4,15 +4,14 @@ Autonomous operator: runs full-spectrum operations with profiling, traps, and so
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .tools import ALL_AGENT_TOOLS
-from .executor import execute as execute_tool
 from .evaluator import evaluate_success_criteria, get_operation_state
+from .executor import execute as execute_tool
 from .strategies import phase_for_iteration
 
 
-def _build_system_prompt(goal: str, success_criteria: Dict, max_iterations: int) -> str:
+def _build_system_prompt(goal: str, success_criteria: dict, max_iterations: int) -> str:
     return f"""You are an autonomous information warfare operator with access to HoleSpawn
 AND direct control of social media accounts (Discord bot, Twitter account).
 
@@ -101,7 +100,7 @@ Think multi-turn. Build relationships. Deploy strategically. Learn continuously.
 Execute autonomously. You have real social media accounts. Use them wisely."""
 
 
-def _execute_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+def _execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """Dispatch to executor."""
     return execute_tool(name, arguments)
 
@@ -112,7 +111,7 @@ class AutonomousOperator:
     def __init__(
         self,
         goal: str,
-        success_criteria: Optional[Dict[str, Any]] = None,
+        success_criteria: dict[str, Any] | None = None,
         model_type: str = "claude",
         max_iterations: int = 20,
     ):
@@ -122,7 +121,7 @@ class AutonomousOperator:
         self.max_iterations = max_iterations
         self._system_prompt = _build_system_prompt(goal, self.success_criteria, max_iterations)
 
-    def run(self, initial_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run(self, initial_data: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Run the autonomous operation.
         initial_data: e.g. {"platform": "discord", "server_id": "...", "discord_exports": [...], "twitter_accounts": [...]}
@@ -131,12 +130,15 @@ class AutonomousOperator:
         from holespawn.llm import call_llm
 
         initial_data = initial_data or {}
-        messages: List[Dict[str, Any]] = [
+        messages: list[dict[str, Any]] = [
             {"role": "system", "content": self._system_prompt},
-            {"role": "user", "content": f"Begin the operation. Initial context: {json.dumps(initial_data)}"},
+            {
+                "role": "user",
+                "content": f"Begin the operation. Initial context: {json.dumps(initial_data)}",
+            },
         ]
         iteration = 0
-        outcomes: List[Dict] = []
+        outcomes: list[dict] = []
 
         while iteration < self.max_iterations:
             iteration += 1
@@ -152,7 +154,9 @@ class AutonomousOperator:
                     "outcomes": outcomes,
                 }
             # Call LLM with tools (single user turn then parse tool use from response)
-            example = '{"tool": "tool_name", "arguments": {...}} or {"done": true, "summary": "..."}'
+            example = (
+                '{"tool": "tool_name", "arguments": {...}} or {"done": true, "summary": "..."}'
+            )
             prompt = f"Current iteration: {iteration}. Phase: {phase}. Operation state: {json.dumps(state)}. Success criteria met? {eval_result.get('met', False)}. What is your next action? Reply with JSON only, e.g. {example}."
             if outcomes:
                 prompt += "\n\nLast results:\n" + json.dumps(outcomes[-3:], indent=2)
@@ -195,7 +199,12 @@ class AutonomousOperator:
             result = _execute_tool(tool_name, tool_args)
             outcomes.append({"tool": tool_name, "arguments": tool_args, "result": result})
             done_hint = '{"done": true}'
-            messages.append({"role": "user", "content": f"Tool {tool_name} result: {json.dumps(result)}. Continue or finish with {done_hint}."})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Tool {tool_name} result: {json.dumps(result)}. Continue or finish with {done_hint}.",
+                }
+            )
 
         return {
             "completed": False,

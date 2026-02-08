@@ -3,17 +3,17 @@ Validate that generated site content actually matches the psychological profile.
 Checks vocabulary usage, interest references, and blocks generic mystery-speak for non-cryptic profiles.
 """
 
-from typing import List
-
 
 class ContentValidator:
     """Validate that generated content matches profile requirements."""
 
-    def __init__(self, profile: object, min_vocab_match: float = 0.15, max_generic_mystery: int = 3):
+    def __init__(
+        self, profile: object, min_vocab_match: float = 0.15, max_generic_mystery: int = 3
+    ):
         self.profile = profile
         self.min_vocab_match = min_vocab_match
         self.max_generic_mystery = max_generic_mystery
-        self.errors: List[str] = []
+        self.errors: list[str] = []
 
     def validate_content(self, content: str) -> bool:
         """Check if content matches profile (vocabulary, interests, no generic mystery-speak)."""
@@ -35,8 +35,16 @@ class ContentValidator:
         comm = getattr(self.profile, "communication_style", "")
         if "cryptic" not in comm and "conspiratorial" not in comm:
             generic = [
-                "protocol", "directive", "ephemeral", "manifest",
-                "nexus", "paradigm shift", "unveil", "initiate", "revelation", "emerge",
+                "protocol",
+                "directive",
+                "ephemeral",
+                "manifest",
+                "nexus",
+                "paradigm shift",
+                "unveil",
+                "initiate",
+                "revelation",
+                "emerge",
             ]
             count = sum(1 for w in generic if w in content_lower)
             if count > self.max_generic_mystery:

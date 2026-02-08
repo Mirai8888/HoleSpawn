@@ -1,6 +1,6 @@
 """Tests for voice-matched profile and content generation."""
 
-from holespawn.ingest import load_from_text, SocialContent
+from holespawn.ingest import load_from_text
 from holespawn.profile import build_profile
 
 
@@ -75,10 +75,20 @@ def test_tech_optimist_has_interests():
         "building in public, here's what I learned today"
     )
     profile = build_profile(content)
-    assert profile.communication_style in ("casual/memey", "direct/concise", "conversational/rambling")
+    assert profile.communication_style in (
+        "casual/memey",
+        "direct/concise",
+        "conversational/rambling",
+    )
     vocab = " ".join(profile.vocabulary_sample).lower()
     # Should have some tech/product words
-    assert "code" in vocab or "feature" in vocab or "building" in vocab or "tech" in vocab or "productivity" in vocab
+    assert (
+        "code" in vocab
+        or "feature" in vocab
+        or "building" in vocab
+        or "tech" in vocab
+        or "productivity" in vocab
+    )
 
 
 def test_browsing_style_and_multipage():
@@ -89,7 +99,13 @@ def test_browsing_style_and_multipage():
     profile = build_profile(content)
     assert hasattr(profile, "browsing_style")
     # Doom-heavy posts may get doom_scroller
-    assert profile.browsing_style in ("doom_scroller", "scanner", "deep_diver", "visual_browser", "thread_reader")
+    assert profile.browsing_style in (
+        "doom_scroller",
+        "scanner",
+        "deep_diver",
+        "visual_browser",
+        "thread_reader",
+    )
     # Multipage decision
     use = should_build_multipage(profile)
     assert isinstance(use, bool)

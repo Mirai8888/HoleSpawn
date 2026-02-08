@@ -8,7 +8,7 @@ import csv
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 try:
     from loguru import logger
@@ -26,12 +26,15 @@ except ImportError:
 try:
     from tqdm import tqdm
 except ImportError:
+
     def tqdm(it, desc=None, **kwargs):
         return it
 
+
 try:
     import networkx as nx
-    from networkx.algorithms.centrality import degree_centrality, betweenness_centrality
+    from networkx.algorithms.centrality import betweenness_centrality, degree_centrality
+
     try:
         from networkx.algorithms.community import greedy_modularity_communities
     except ImportError:
@@ -172,7 +175,13 @@ def load_edges_file(
 def _profile_vector(profile: dict[str, Any]) -> set[str]:
     """Set of tokens for similarity (vocabulary + themes + interests)."""
     tokens = set()
-    for key in ("vocabulary_sample", "specific_interests", "obsessions", "cultural_references", "sample_phrases"):
+    for key in (
+        "vocabulary_sample",
+        "specific_interests",
+        "obsessions",
+        "cultural_references",
+        "sample_phrases",
+    ):
         val = profile.get(key)
         if isinstance(val, list):
             for v in val[:50]:
@@ -218,7 +227,10 @@ def _compute_similarity_matrix_vectorized(
     if not vocabulary:
         return [[0.0] * len(ids) for _ in ids]
     vectors = np.array(
-        [_profile_to_binary_vector(profiles[i], vocabulary) for i in tqdm(ids, desc="Vectorizing profiles")],
+        [
+            _profile_to_binary_vector(profiles[i], vocabulary)
+            for i in tqdm(ids, desc="Vectorizing profiles")
+        ],
         dtype=np.uint8,
     )
     distances = pdist(vectors, metric="jaccard")
@@ -239,7 +251,7 @@ class NetworkAnalyzer:
     def analyze_network(
         self,
         profiles: dict[str, dict[str, Any]],
-        edges: Optional[list[tuple[str, str]]] = None,
+        edges: list[tuple[str, str]] | None = None,
         use_community_detection: bool = True,
     ) -> dict[str, Any]:
         """
@@ -249,16 +261,28 @@ class NetworkAnalyzer:
         Returns report dict: clusters, central_accounts, influence_graph (if edges), stats.
         """
         if not profiles:
-            return {"clusters": [], "central_accounts": [], "influence_graph": None, "stats": {"n_profiles": 0}}
+            return {
+                "clusters": [],
+                "central_accounts": [],
+                "influence_graph": None,
+                "stats": {"n_profiles": 0},
+            }
 
-        report: dict[str, Any] = {"clusters": [], "central_accounts": [], "influence_graph": None, "stats": {}}
+        report: dict[str, Any] = {
+            "clusters": [],
+            "central_accounts": [],
+            "influence_graph": None,
+            "stats": {},
+        }
         report["stats"]["n_profiles"] = len(profiles)
         ids = list(profiles.keys())
 
         if nx is None or greedy_modularity_communities is None:
             report["clusters"] = [ids]
             report["central_accounts"] = ids[:5]
-            report["stats"]["warning"] = "networkx not installed; install with: pip install networkx"
+            report["stats"]["warning"] = (
+                "networkx not installed; install with: pip install networkx"
+            )
             return report
 
         # Build graph: from edges if provided, else from profile similarity
@@ -319,7 +343,9 @@ class NetworkAnalyzer:
             if edges and G.is_directed() and G.number_of_edges() > 0:
                 try:
                     bet = betweenness_centrality(G)
-                    report["betweenness_centrality"] = {k: round(v, 4) for k, v in sorted(bet.items(), key=lambda x: -x[1])[:20]}
+                    report["betweenness_centrality"] = {
+                        k: round(v, 4) for k, v in sorted(bet.items(), key=lambda x: -x[1])[:20]
+                    }
                 except Exception:
                     pass
         except Exception:

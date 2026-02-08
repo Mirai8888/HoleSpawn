@@ -4,7 +4,6 @@ Requires APIFY_API_TOKEN. Returns [] if no token; raises ApifyError on API failu
 """
 
 import os
-from typing import Optional
 
 from holespawn.errors import ApifyError
 
@@ -15,7 +14,7 @@ APIFY_FOLLOWING_ACTOR_DEFAULT = "powerai/twitter-following-scraper"
 def fetch_following_apify(
     username: str,
     max_results: int = 200,
-    actor_id: Optional[str] = None,
+    actor_id: str | None = None,
 ) -> list[str]:
     """
     Fetch the list of usernames that a Twitter user follows, via Apify.
@@ -46,7 +45,12 @@ def fetch_following_apify(
     for item in items:
         if isinstance(item, dict):
             # Common field names from following/followers actors
-            h = item.get("screen_name") or item.get("username") or item.get("handle") or item.get("screenName")
+            h = (
+                item.get("screen_name")
+                or item.get("username")
+                or item.get("handle")
+                or item.get("screenName")
+            )
             if h:
                 handles.append(str(h).strip().lstrip("@"))
         elif isinstance(item, str):

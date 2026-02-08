@@ -43,6 +43,8 @@ venv\Scripts\activate     # Windows
 **3. Dependency installation**
 ```bash
 pip install -r requirements.txt
+# or, with pyproject.toml:  pip install -e .
+# or, with uv:              uv sync
 ```
 
 **4. Credential configuration**
@@ -70,6 +72,33 @@ System surfaces errors with clear classification:
 - Apify errors: `ApifyError` class
 - LLM errors: `LLM call failed (provider=... model=...): ...`
 - CLI errors: `[holespawn]` prefix on stderr
+
+### Development setup (uv, pytest, ruff, mypy)
+
+The project uses a modern Python toolchain. Install with **uv** (recommended) or pip:
+
+**Option A: uv**
+```bash
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
+uv sync --extra dev
+uv run pytest
+uv run ruff check holespawn tests scripts
+uv run ruff format holespawn tests scripts
+uv run mypy holespawn
+```
+
+**Option B: pip**
+```bash
+pip install -e ".[dev]"
+pytest
+ruff check holespawn tests scripts
+ruff format holespawn tests scripts
+mypy holespawn
+```
+
+- **pytest** — Tests live in `tests/`. Run with `pytest` or `uv run pytest`. One test (`test_build_discord_profile_hybrid_nlp_only`) requires NLTK data: `python -m nltk.download punkt_tab`.
+- **ruff** — Linting and formatting. Config in `pyproject.toml` under `[tool.ruff]`. Auto-fix with `ruff check ... --fix` and `ruff format ...`.
+- **mypy** — Type checking on `holespawn/`. Config in `pyproject.toml` under `[tool.mypy]`. Some type errors may remain; fix over time.
 
 ---
 

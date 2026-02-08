@@ -103,9 +103,7 @@ def hub_spoke_page(
         href = _escape(c.get("href", c.get("id", "#") + ".html"))
         tit = _escape(c.get("title", c.get("id", "")))
         desc = _escape(c.get("description", ""))[:120]
-        cards_html.append(
-            f'<a class="hub-card" href="{href}"><h3>{tit}</h3><p>{desc}</p></a>'
-        )
+        cards_html.append(f'<a class="hub-card" href="{href}"><h3>{tit}</h3><p>{desc}</p></a>')
     cards_body = "\n".join(cards_html)
     return f"""<!DOCTYPE html>
 <html lang="en">

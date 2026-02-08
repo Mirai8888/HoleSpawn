@@ -6,7 +6,6 @@ tone, and structure from the subject's psychological profile and narrative.
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 try:
     from jsonschema import ValidationError as JsonSchemaValidationError
@@ -20,6 +19,7 @@ from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
 from holespawn.llm import call_llm
 from holespawn.profile import PsychologicalProfile
+
 
 @dataclass
 class SectionSpec:
@@ -128,16 +128,16 @@ def _extract_json(raw: str) -> dict:
         if not text.strip().startswith("{"):
             try:
                 from loguru import logger
+
                 logger.error("No JSON found in LLM response: {}", raw[:500])
             except ImportError:
                 pass
-            raise ValueError(
-                f"No JSON object found in LLM response. Got: {raw[:500]}..."
-            )
+            raise ValueError(f"No JSON object found in LLM response. Got: {raw[:500]}...")
         return json.loads(text)
     except json.JSONDecodeError as e:
         try:
             from loguru import logger
+
             logger.error("Failed to parse JSON from LLM response: {}", raw[:1000])
         except ImportError:
             pass
@@ -158,6 +158,7 @@ def _validate_experience_spec(data: dict) -> None:
         msg = e.message if hasattr(e, "message") else str(e)
         try:
             from loguru import logger
+
             logger.warning("LLM returned incomplete experience spec: {}", msg)
         except ImportError:
             pass
@@ -190,7 +191,10 @@ DO USE: Short punchy titles, clear concrete language""",
 - DON'T be: Overly mysterious or corporate
 DO USE: Natural conversational language, their actual phrases""",
     }
-    return patterns.get(style, "Match their actual communication style. Avoid generic mystery-speak unless they are cryptic.")
+    return patterns.get(
+        style,
+        "Match their actual communication style. Avoid generic mystery-speak unless they are cryptic.",
+    )
 
 
 def _get_style_examples(style: str) -> str:
@@ -221,16 +225,18 @@ BAD SECTION: "The Unseen Protocol" """,
         "cryptic/conspiratorial": """
 Can use mystery language but MUST use their vocabulary and reference their specific interests (not generic "truth" or "protocol").""",
     }
-    return examples.get(style, "Title and tagline must sound like something THEY would say, not generic mystery.")
+    return examples.get(
+        style, "Title and tagline must sound like something THEY would say, not generic mystery."
+    )
 
 
 def get_experience_spec(
     content: SocialContent,
     profile: PsychologicalProfile,
     *,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> ExperienceSpec:
     """Call AI to generate a personalized experience spec from profile + narrative."""
@@ -244,14 +250,14 @@ def get_experience_spec(
 
     vocab_requirement = f"""
 CRITICAL: You MUST use these specific words/phrases from their actual posts in title, tagline, or section names:
-{', '.join(vocab) if vocab else 'N/A'}
+{", ".join(vocab) if vocab else "N/A"}
 
 Every section name should include at least 1–2 of these words. The title must use words from this list. This is NON-NEGOTIABLE.
 The experience should sound like THEY wrote it, not like a generic mystery."""
 
     interest_requirements = f"""
 REQUIRED TOPICS: Every section must reference at least ONE of these specific interests (use as section themes or focus):
-{', '.join(interests) if interests else 'N/A'}
+{", ".join(interests) if interests else "N/A"}
 
 Don't be abstract ("complex systems"). Be concrete — use their actual interest words (e.g. from the list above)."""
 
@@ -272,8 +278,8 @@ ANTI-PATTERNS (DO NOT DO THIS):
 
 Profile data:
 - Top themes: {themes_str}
-- Obsessions: {', '.join(obsessions) if obsessions else 'N/A'}
-- Pet peeves / anxiety triggers: {', '.join(getattr(profile, 'pet_peeves', [])[:8]) or 'N/A'}
+- Obsessions: {", ".join(obsessions) if obsessions else "N/A"}
+- Pet peeves / anxiety triggers: {", ".join(getattr(profile, "pet_peeves", [])[:8]) or "N/A"}
 - Sample phrases they actually use: {sample_phrases_str}
 - Sentiment: {profile.sentiment_compound:.2f}
 

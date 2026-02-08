@@ -4,8 +4,9 @@ Each architecture produces a content graph (page_name -> page_data) with real hy
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 from holespawn.experience import ExperienceSpec
 from holespawn.ingest import SocialContent
@@ -15,6 +16,7 @@ from holespawn.profile import PsychologicalProfile
 @dataclass
 class ArchitectureConfig:
     """Configuration for an architecture (page counts, links, style)."""
+
     page_count: int = 10
     links_per_page_min: int = 3
     style: str = "default"
@@ -36,9 +38,9 @@ class BaseArchitecture(ABC):
         call_llm: Callable[..., str],
         context_str: str,
         voice_guide: str,
-        tracker: Optional[Any] = None,
-        provider: Optional[str] = None,
-        model: Optional[str] = None,
+        tracker: Any | None = None,
+        provider: str | None = None,
+        model: str | None = None,
         calls_per_minute: int = 20,
     ) -> dict[str, dict[str, Any]]:
         """

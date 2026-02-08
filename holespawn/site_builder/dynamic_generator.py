@@ -5,7 +5,7 @@ Replaces rigid template flow with profile-driven structure.
 
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from holespawn.context import build_context
 from holespawn.cost_tracker import CostTracker
@@ -13,9 +13,9 @@ from holespawn.experience import ExperienceSpec
 from holespawn.ingest import SocialContent
 from holespawn.llm import call_llm
 from holespawn.profile import PsychologicalProfile
-from holespawn.site_builder.content import _build_voice_guide
 from holespawn.site_builder.architectures import choose_architecture
 from holespawn.site_builder.architectures.base import BaseArchitecture
+from holespawn.site_builder.content import _build_voice_guide
 from holespawn.site_builder.dynamic_renderer import render_pages
 
 logger = logging.getLogger(__name__)
@@ -49,9 +49,9 @@ def generate_dynamic_site(
     spec: ExperienceSpec,
     output_dir: Path,
     *,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> BaseArchitecture:
     """

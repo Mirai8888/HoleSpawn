@@ -6,6 +6,7 @@ themes, sentiment, rhythm, obsessions, emotional valence, voice/style.
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from holespawn.ingest import SocialContent
@@ -29,20 +30,138 @@ except ImportError:
 
 # Common stopwords (English) for theme extraction
 STOP = {
-    "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your",
-    "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she",
-    "her", "hers", "herself", "it", "its", "itself", "they", "them", "their",
-    "theirs", "themselves", "what", "which", "who", "whom", "this", "that",
-    "these", "those", "am", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "having", "do", "does", "did", "doing", "a", "an",
-    "the", "and", "but", "if", "or", "because", "as", "until", "while", "of",
-    "at", "by", "for", "with", "about", "against", "between", "into", "through",
-    "during", "before", "after", "above", "below", "to", "from", "up", "down",
-    "in", "out", "on", "off", "over", "under", "again", "further", "then",
-    "once", "here", "there", "when", "where", "why", "how", "all", "each",
-    "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only",
-    "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just",
-    "don", "should", "now", "rt", "via", "amp", "like", "get", "got", "im",
+    "i",
+    "me",
+    "my",
+    "myself",
+    "we",
+    "our",
+    "ours",
+    "ourselves",
+    "you",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+    "he",
+    "him",
+    "his",
+    "himself",
+    "she",
+    "her",
+    "hers",
+    "herself",
+    "it",
+    "its",
+    "itself",
+    "they",
+    "them",
+    "their",
+    "theirs",
+    "themselves",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "this",
+    "that",
+    "these",
+    "those",
+    "am",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "having",
+    "do",
+    "does",
+    "did",
+    "doing",
+    "a",
+    "an",
+    "the",
+    "and",
+    "but",
+    "if",
+    "or",
+    "because",
+    "as",
+    "until",
+    "while",
+    "of",
+    "at",
+    "by",
+    "for",
+    "with",
+    "about",
+    "against",
+    "between",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "to",
+    "from",
+    "up",
+    "down",
+    "in",
+    "out",
+    "on",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "s",
+    "t",
+    "can",
+    "will",
+    "just",
+    "don",
+    "should",
+    "now",
+    "rt",
+    "via",
+    "amp",
+    "like",
+    "get",
+    "got",
+    "im",
 }
 
 
@@ -80,7 +199,9 @@ class PsychologicalProfile:
     pet_peeves: list[str] = field(default_factory=list)
 
     # Browsing / consumption patterns (for multi-page attention trap)
-    browsing_style: str = "scanner"  # deep_diver, scanner, doom_scroller, visual_browser, thread_reader
+    browsing_style: str = (
+        "scanner"  # deep_diver, scanner, doom_scroller, visual_browser, thread_reader
+    )
     content_density_preference: str = "moderate"  # dense, moderate, sparse
     visual_preference: str = "balanced"  # text_heavy, balanced, image_heavy
     link_following_likelihood: str = "medium"  # high, medium, low
@@ -120,6 +241,7 @@ def _sentiment_stats(posts: list[str]) -> tuple[float, float, float, float, floa
     pos, neg, neu = [], [], []
     try:
         from tqdm import tqdm
+
         post_iter = tqdm(posts, desc="Analyzing posts", unit="post", leave=False)
     except ImportError:
         post_iter = posts
@@ -180,7 +302,13 @@ def _analyze_communication_style(posts: list[str]) -> str:
     has_irony = sum(1 for m in irony_markers if m in combined) >= 2
     academic_markers = ["however", "moreover", "thus", "therefore", "specifically", "furthermore"]
     is_academic = sum(1 for m in academic_markers if m in combined) > 2
-    cryptic_markers = ["...", "they dont want you to know", "wake up", "the truth", "they don't want"]
+    cryptic_markers = [
+        "...",
+        "they dont want you to know",
+        "wake up",
+        "the truth",
+        "they don't want",
+    ]
     is_cryptic = any(m in combined for m in cryptic_markers)
     avg_length = sum(len(p.split()) for p in posts) / len(posts) if posts else 0
     is_punchy = avg_length < 15
@@ -195,7 +323,9 @@ def _analyze_communication_style(posts: list[str]) -> str:
     return "conversational/rambling"
 
 
-def _extract_unique_vocabulary(posts: list[str], themes: list[tuple[str, float]], top_n: int = 30) -> list[str]:
+def _extract_unique_vocabulary(
+    posts: list[str], themes: list[tuple[str, float]], top_n: int = 30
+) -> list[str]:
     """Their most-used distinctive words (from themes, excluding generic)."""
     return [t[0] for t in themes[:top_n] if t[0] and len(t[0]) > 2]
 
@@ -219,7 +349,9 @@ def _analyze_sentence_structure(posts: list[str]) -> str:
     if not posts:
         return "mixed"
     avg_len = sum(len(p.split()) for p in posts) / len(posts) if posts else 0
-    bullet_like = sum(1 for p in posts if p.strip().startswith(("-", "*", "•")) or "\n-" in p) / max(len(posts), 1)
+    bullet_like = sum(
+        1 for p in posts if p.strip().startswith(("-", "*", "•")) or "\n-" in p
+    ) / max(len(posts), 1)
     if bullet_like > 0.2:
         return "bullet points"
     if avg_len < 12:
@@ -287,8 +419,12 @@ def _analyze_browsing_style(posts: list[str]) -> str:
     combined = " ".join(posts).lower()
     n = len(posts)
     anxiety = sum(
-        1 for p in posts
-        if any(w in p.lower() for w in ["crisis", "worried", "anxious", "doom", "collapse", "everything is"])
+        1
+        for p in posts
+        if any(
+            w in p.lower()
+            for w in ["crisis", "worried", "anxious", "doom", "collapse", "everything is"]
+        )
     )
     if anxiety > n * 0.25:
         return "doom_scroller"
@@ -297,8 +433,11 @@ def _analyze_browsing_style(posts: list[str]) -> str:
     if (long_posts > n * 0.15) or (has_threads >= 2):
         return "deep_diver"
     image_refs = sum(
-        1 for p in posts
-        if any(m in p.lower() for m in ["pic", "image", "screenshot", "look at this", "photo", "📷"])
+        1
+        for p in posts
+        if any(
+            m in p.lower() for m in ["pic", "image", "screenshot", "look at this", "photo", "📷"]
+        )
     )
     if image_refs > n * 0.25:
         return "visual_browser"
@@ -323,10 +462,22 @@ def _analyze_content_density(posts: list[str]) -> str:
 def _infer_aesthetic_from_style(communication_style: str) -> tuple[str, str, str]:
     """Infer color_palette, layout_style, typography_vibe from communication style."""
     aesthetics = {
-        "casual/memey": ("bright, high contrast", "chaotic, playful", "sans-serif, varied, emoji-friendly"),
+        "casual/memey": (
+            "bright, high contrast",
+            "chaotic, playful",
+            "sans-serif, varied, emoji-friendly",
+        ),
         "academic/formal": ("muted, professional", "structured, hierarchical", "serif, consistent"),
-        "cryptic/conspiratorial": ("dark, terminal-like", "minimal, stark", "monospace or distressed"),
-        "direct/concise": ("clean, minimal", "brutalist, efficient", "modern sans, large clear type"),
+        "cryptic/conspiratorial": (
+            "dark, terminal-like",
+            "minimal, stark",
+            "monospace or distressed",
+        ),
+        "direct/concise": (
+            "clean, minimal",
+            "brutalist, efficient",
+            "modern sans, large clear type",
+        ),
         "conversational/rambling": ("warm, neutral", "balanced", "readable sans"),
     }
     return aesthetics.get(communication_style, ("neutral", "balanced", "clean sans"))
@@ -368,7 +519,19 @@ def _extract_discord_signals(discord_data: dict) -> dict:
         combined = " ".join(reacted_contents).lower()
         words = re.findall(r"\b[a-z]{4,}\b", combined)
         from collections import Counter
-        stop = STOP | {"this", "that", "what", "when", "with", "from", "have", "been", "were", "about"}
+
+        stop = STOP | {
+            "this",
+            "that",
+            "what",
+            "when",
+            "with",
+            "from",
+            "have",
+            "been",
+            "were",
+            "about",
+        }
         counts = Counter(w for w in words if w not in stop)
         out["reaction_triggers"] = [w for w, _ in counts.most_common(12)]
 
@@ -382,7 +545,21 @@ def _extract_discord_signals(discord_data: dict) -> dict:
         if contents:
             avg_len = sum(len(c.split()) for c in contents) / len(contents)
             combined = " ".join(contents).lower()
-            vulnerable = sum(1 for w in ["honestly", "actually", "feel", "struggle", "anxious", "worried", "idk", "imo", "tbh"] if w in combined)
+            vulnerable = sum(
+                1
+                for w in [
+                    "honestly",
+                    "actually",
+                    "feel",
+                    "struggle",
+                    "anxious",
+                    "worried",
+                    "idk",
+                    "imo",
+                    "tbh",
+                ]
+                if w in combined
+            )
             if avg_len > 40 and vulnerable > 2:
                 out["conversational_intimacy"] = "vulnerable"
             elif avg_len < 12 and vulnerable < 1:
@@ -392,10 +569,11 @@ def _extract_discord_signals(discord_data: dict) -> dict:
 
     # Community role: from interactions and message volume
     interactions = discord_data.get("interactions") or []
-    total_interactions = sum(
-        int(x.get("interaction_count", 0)) for x in interactions
-        if isinstance(x, dict)
-    ) if interactions else 0
+    total_interactions = (
+        sum(int(x.get("interaction_count", 0)) for x in interactions if isinstance(x, dict))
+        if interactions
+        else 0
+    )
     msg_count = len(discord_data.get("messages") or [])
     if msg_count > 100 and total_interactions > 50:
         out["community_role"] = "leader"
@@ -408,7 +586,8 @@ def _extract_discord_signals(discord_data: dict) -> dict:
     activity = discord_data.get("activity_patterns") or {}
     if isinstance(activity, dict):
         out["engagement_rhythm"] = {
-            k: v for k, v in activity.items()
+            k: v
+            for k, v in activity.items()
             if k in ("peak_hours", "active_days", "message_frequency")
         }
 
@@ -452,8 +631,16 @@ def build_profile(content: SocialContent) -> PsychologicalProfile:
     browsing_style = _analyze_browsing_style(posts)
     content_density_preference = _analyze_content_density(posts)
     color_palette, layout_style, typography_vibe = _infer_aesthetic_from_style(communication_style)
-    visual_preference = "image_heavy" if browsing_style == "visual_browser" else ("text_heavy" if content_density_preference == "dense" else "balanced")
-    link_following_likelihood = "high" if browsing_style in ("deep_diver", "doom_scroller") else ("medium" if browsing_style == "thread_reader" else "low")
+    visual_preference = (
+        "image_heavy"
+        if browsing_style == "visual_browser"
+        else ("text_heavy" if content_density_preference == "dense" else "balanced")
+    )
+    link_following_likelihood = (
+        "high"
+        if browsing_style in ("deep_diver", "doom_scroller")
+        else ("medium" if browsing_style == "thread_reader" else "low")
+    )
 
     # Discord-specific signals when present
     discord_supplement = _extract_discord_signals(getattr(content, "discord_data", None))

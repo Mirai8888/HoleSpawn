@@ -5,7 +5,7 @@ Use only with API access you are authorized to use.
 """
 
 from dataclasses import asdict
-from typing import Any, Optional
+from typing import Any
 
 from holespawn.ingest import fetch_twitter_apify
 from holespawn.ingest.apify_following import fetch_following_apify
@@ -39,7 +39,9 @@ def fetch_profiles_via_apify(
         # Fallback: just profile the target
         following = [target_username] if include_target else []
     elif include_target and target_username not in following:
-        following = [target_username] + [u for u in following if u != target_username][: max_following - 1]
+        following = [target_username] + [u for u in following if u != target_username][
+            : max_following - 1
+        ]
 
     profiles: dict[str, dict[str, Any]] = {}
     for username in following:

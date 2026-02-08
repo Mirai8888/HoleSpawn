@@ -6,7 +6,6 @@ Uses AI-generated design system when profile is provided.
 
 import html
 from pathlib import Path
-from typing import Any, Optional
 
 from holespawn.experience import ExperienceSpec, SectionSpec
 from holespawn.profile import PsychologicalProfile
@@ -17,8 +16,21 @@ except ImportError:
     bleach = None
 
 ALLOWED_TAGS = [
-    "p", "br", "strong", "em", "a", "ul", "ol", "li",
-    "h1", "h2", "h3", "h4", "blockquote", "code", "pre",
+    "p",
+    "br",
+    "strong",
+    "em",
+    "a",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "blockquote",
+    "code",
+    "pre",
 ]
 ALLOWED_ATTRS = {"a": ["href", "title"], "code": ["class"]}
 
@@ -129,7 +141,7 @@ def build_site(
     spec: ExperienceSpec,
     sections_content: list[dict],
     output_dir: str | Path,
-    profile: Optional[PsychologicalProfile] = None,
+    profile: PsychologicalProfile | None = None,
 ) -> None:
     """
     Generate a full static website into output_dir.
@@ -171,6 +183,7 @@ def build_site(
 
     if profile is not None:
         from holespawn.site_builder.pure_generator import generate_design_system
+
         css = generate_design_system(profile, spec)
     else:
         css = _fallback_css(spec)

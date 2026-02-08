@@ -5,15 +5,14 @@ Real-time style: system logs, found documents, cryptic breadcrumbs.
 
 import random
 import time
-from typing import Iterator
+from collections.abc import Iterator
 
 from holespawn.profile import PsychologicalProfile
-
 
 # ARG-style fragment templates. {theme_N}, {phrase}, {mood} etc. filled from profile.
 SYSTEM_LOG_TEMPLATES = [
     "[SYS] subj_ref_{theme_0}_{theme_1} // confidence: {confidence:.2f}",
-    "[LOG] pattern_match: \"{phrase}\" | flag: {mood}",
+    '[LOG] pattern_match: "{phrase}" | flag: {mood}',
     "[ERR] overflow in sector {theme_0} — check {theme_1}",
     "[SYS] heartbeat_{theme_0} | last_seen: {timestamp}",
     "[REDACTED] ... {phrase} ... [REDACTED]",
@@ -22,11 +21,11 @@ SYSTEM_LOG_TEMPLATES = [
 ]
 
 FOUND_DOC_TEMPLATES = [
-    "--- EXTRACT ---\n\"{phrase}\"\n--- END ---",
+    '--- EXTRACT ---\n"{phrase}"\n--- END ---',
     "MEMO: re: {theme_0}. See also: {theme_1}, {theme_2}.",
     "CLASSIFIED\nSubject exhibits {mood} bias. Keywords: {theme_0}, {theme_1}.",
     "NOTE: {phrase}\n[source: unknown]",
-    "FILE CORRUPTED\nRecovered: \"{theme_0}\" ... \"{theme_1}\" ...",
+    'FILE CORRUPTED\nRecovered: "{theme_0}" ... "{theme_1}" ...',
 ]
 
 BREADCRUMB_TEMPLATES = [
@@ -39,7 +38,12 @@ BREADCRUMB_TEMPLATES = [
 ]
 
 GLITCH_PREFIXES = [
-    "", "/// ", ">>> ", "[?] ", "*** ", "--- ",
+    "",
+    "/// ",
+    ">>> ",
+    "[?] ",
+    "*** ",
+    "--- ",
 ]
 
 
@@ -69,7 +73,7 @@ def _fill(template: str, p: PsychologicalProfile) -> str:
     phrase = _pick_phrase(p)
     confidence = 0.5 + 0.5 * p.intensity
     depth = random.randint(1, 99)
-    timestamp = f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:??"
+    timestamp = f"{random.randint(0, 23):02d}:{random.randint(0, 59):02d}:??"
     return template.format(
         theme_0=themes[0] if len(themes) > 0 else "x",
         theme_1=themes[1] if len(themes) > 1 else "x",
@@ -94,11 +98,7 @@ class RabbitHoleGenerator:
         self.profile = profile
 
     def _next_fragment(self) -> str:
-        pool = (
-            SYSTEM_LOG_TEMPLATES * 2
-            + FOUND_DOC_TEMPLATES
-            + BREADCRUMB_TEMPLATES
-        )
+        pool = SYSTEM_LOG_TEMPLATES * 2 + FOUND_DOC_TEMPLATES + BREADCRUMB_TEMPLATES
         template = random.choice(pool)
         return _glitch(_fill(template, self.profile))
 

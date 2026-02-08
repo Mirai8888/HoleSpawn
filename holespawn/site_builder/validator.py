@@ -3,7 +3,7 @@ Validate generated site (HTML/CSS/JS) for common errors and optional voice match
 """
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from holespawn.profile import PsychologicalProfile
@@ -14,7 +14,7 @@ class SiteValidator:
 
     def __init__(self, site_dir: str | Path):
         self.site_dir = Path(site_dir)
-        self.errors: List[str] = []
+        self.errors: list[str] = []
 
     def validate_html(self) -> bool:
         html_file = self.site_dir / "index.html"
@@ -22,7 +22,7 @@ class SiteValidator:
             self.errors.append("Missing index.html")
             return False
         try:
-            with open(html_file, "r", encoding="utf-8") as f:
+            with open(html_file, encoding="utf-8") as f:
                 html = f.read()
         except OSError as e:
             self.errors.append(f"Cannot read index.html: {e}")
@@ -42,7 +42,7 @@ class SiteValidator:
             self.errors.append("Missing styles.css")
             return False
         try:
-            with open(css_file, "r", encoding="utf-8") as f:
+            with open(css_file, encoding="utf-8") as f:
                 css = f.read()
         except OSError as e:
             self.errors.append(f"Cannot read styles.css: {e}")
@@ -58,7 +58,7 @@ class SiteValidator:
             self.errors.append("Missing app.js")
             return False
         try:
-            with open(js_file, "r", encoding="utf-8") as f:
+            with open(js_file, encoding="utf-8") as f:
                 js = f.read()
         except OSError as e:
             self.errors.append(f"Cannot read app.js: {e}")
@@ -96,8 +96,14 @@ class SiteValidator:
         comm = getattr(profile, "communication_style", "")
         if block_generic_cryptic and "cryptic" not in comm and "conspiratorial" not in comm:
             generic = [
-                "protocol", "directive", "ephemeral", "manifest",
-                "nexus", "paradigm shift", "unveil", "initiate",
+                "protocol",
+                "directive",
+                "ephemeral",
+                "manifest",
+                "nexus",
+                "paradigm shift",
+                "unveil",
+                "initiate",
             ]
             count = sum(1 for p in generic if p in content)
             if count > 2:
@@ -120,5 +126,5 @@ class SiteValidator:
             self.validate_voice_matching(profile, min_vocab_match=min_vocab_match)
         return len(self.errors) == 0
 
-    def get_errors(self) -> List[str]:
+    def get_errors(self) -> list[str]:
         return list(self.errors)

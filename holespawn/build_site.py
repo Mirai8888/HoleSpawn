@@ -14,7 +14,6 @@ import sys
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -23,6 +22,7 @@ if str(ROOT) not in sys.path:
 # Load .env so API keys are available (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
 try:
     from dotenv import load_dotenv
+
     _env_path = ROOT / ".env"
     if _env_path.exists():
         # Windows often saves .env as UTF-16; try UTF-8 first, then UTF-16
@@ -39,26 +39,27 @@ except ImportError:
 
 from holespawn.cache import ProfileCache
 from holespawn.config import load_config
-from holespawn.cost_tracker import CostExceededError, CostTracker
+from holespawn.cost_tracker import CostTracker
 from holespawn.errors import ApifyError
+from holespawn.experience import get_experience_spec
 from holespawn.ingest import (
+    SocialContent,
+    fetch_twitter_apify,
+    load_from_discord,
     load_from_file,
     load_from_text,
     load_from_twitter_archive,
-    fetch_twitter_apify,
-    load_from_discord,
-    SocialContent,
 )
-from holespawn.profile import build_profile, PsychologicalProfile
-from holespawn.experience import get_experience_spec
-from holespawn.site_builder import get_site_content, build_site
-from holespawn.site_builder.validator import SiteValidator
+from holespawn.profile import PsychologicalProfile, build_profile
+from holespawn.site_builder import build_site, get_site_content
 from holespawn.site_builder.pure_generator import generate_site_from_profile
+from holespawn.site_builder.validator import SiteValidator
 
 
-def _setup_logging(verbose: bool = False, quiet: bool = False, log_dir: Optional[Path] = None) -> None:
+def _setup_logging(verbose: bool = False, quiet: bool = False, log_dir: Path | None = None) -> None:
     try:
         from loguru import logger
+
         logger.remove()
         level = "DEBUG" if verbose else ("ERROR" if quiet else "INFO")
         logger.add(sys.stderr, level=level, format="<level>{message}</level>")
@@ -82,12 +83,15 @@ def _setup_logging(verbose: bool = False, quiet: bool = False, log_dir: Optional
 def _log(msg: str) -> None:
     try:
         from loguru import logger
+
         logger.info(msg)
     except ImportError:
         print(msg, file=sys.stderr)
 
 
-def _create_output_dir(username: str, base_dir: str = "outputs", use_site_subdir: bool = True) -> Path:
+def _create_output_dir(
+    username: str, base_dir: str = "outputs", use_site_subdir: bool = True
+) -> Path:
     """Create timestamped output directory: outputs/YYYYMMDD_HHMMSS_username."""
     safe = re.sub(r"[^\w\-]", "_", username.strip().lstrip("@")) or "user"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -111,7 +115,12 @@ def _profile_to_dict(profile: PsychologicalProfile) -> dict:
 
 
 def _check_api_keys() -> bool:
-    if os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
+    if (
+        os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+        or os.getenv("GEMINI_API_KEY")
+    ):
         return True
     if os.getenv("LLM_API_BASE"):
         return True  # local OpenAI-compatible endpoint
@@ -122,7 +131,7 @@ def _dry_run(
     content: SocialContent,
     username: str,
     config: dict,
-    provider: Optional[str],
+    provider: str | None,
 ) -> None:
     """Preview generation without LLM calls."""
     _log("DRY RUN — No LLM calls will be made")
@@ -135,11 +144,13 @@ def _dry_run(
     _log("Building profile (local only)...")
     profile = build_profile(content)
     themes = [t[0] for t in profile.themes[:5]]
-    _log(f"Profile preview: sentiment={profile.sentiment_compound:.2f}, top themes={', '.join(themes)}")
+    _log(
+        f"Profile preview: sentiment={profile.sentiment_compound:.2f}, top themes={', '.join(themes)}"
+    )
     # Rough cost estimate
     cfg_llm = config.get("llm", {})
     cfg_costs = config.get("costs", {})
-    model = cfg_llm.get("model", "gemini-2.5-flash")
+    model = cfg_llm.get("model", "claude-sonnet-4-20250514")
     warn = float(cfg_costs.get("warn_threshold", 1.0))
     est_input = min(30_000, sum(len(p) for p in posts) * 2)  # rough tokens
     est_output = 6000  # spec + content + brief
@@ -170,7 +181,10 @@ def _deploy(site_dir: Path) -> None:
         _log("Netlify CLI not found. Free deploy options:")
         _log("  1. Netlify Drop: drag the site folder to https://app.netlify.com/drop")
         _log("  2. GitHub Pages: push the folder to a repo, Settings -> Pages")
-        _log("  3. Install Netlify CLI: npm i -g netlify-cli, then run: netlify deploy --dir=" + str(site_dir))
+        _log(
+            "  3. Install Netlify CLI: npm i -g netlify-cli, then run: netlify deploy --dir="
+            + str(site_dir)
+        )
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -217,7 +231,8 @@ Examples:
         help="Twitter/X username (e.g. @user). Uses Apify; requires APIFY_API_TOKEN.",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         default=None,
         help="Output directory. If omitted, uses outputs/YYYYMMDD_HHMMSS_username/.",
     )
@@ -277,7 +292,8 @@ Examples:
         help="After building: run Netlify CLI if installed.",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Debug logging.",
     )
@@ -307,9 +323,14 @@ def main() -> None:
     config = load_config(args.config)
     _setup_logging(verbose=args.verbose, quiet=args.quiet)
 
+    # Default provider from config when not set by CLI
+    if args.provider is None:
+        args.provider = config.get("llm", {}).get("provider")
+
     # Local model: set env so all call_llm use this endpoint
     if args.local_model or args.model_endpoint or args.model_name:
         from holespawn.config import get_llm_config
+
         llm_cfg = get_llm_config(
             preset=args.local_model,
             api_base=args.model_endpoint,
@@ -321,9 +342,9 @@ def main() -> None:
             os.environ["LLM_MODEL"] = llm_cfg["model"]
 
     # Resolve content source and username
-    content: Optional[SocialContent] = None
+    content: SocialContent | None = None
     username = "user"
-    discord_data: Optional[dict] = None
+    discord_data: dict | None = None
 
     if getattr(args, "discord", None) and Path(args.discord).exists():
         _log("Loading Discord export...")
@@ -335,13 +356,17 @@ def main() -> None:
             _log("No messages in Discord export. Exiting.")
             sys.exit(1)
         _log(f"Loaded {len(posts_list)} messages from Discord.")
-        username = (discord_data.get("username") or discord_data.get("user_id") or "discord_user")[:50]
+        username = (discord_data.get("username") or discord_data.get("user_id") or "discord_user")[
+            :50
+        ]
     elif args.twitter_archive:
         _log("Loading from Twitter archive...")
         content = load_from_twitter_archive(args.twitter_archive)
         posts_list = list(content.iter_posts())
         if not posts_list:
-            _log("No tweets found in archive. Check data/tweets.js (or tweets-part*.js) in the ZIP.")
+            _log(
+                "No tweets found in archive. Check data/tweets.js (or tweets-part*.js) in the ZIP."
+            )
             sys.exit(1)
         _log(f"Loaded {len(posts_list)} tweets from archive.")
         username = Path(args.twitter_archive).stem.replace(" ", "_")[:50]
@@ -356,7 +381,12 @@ def main() -> None:
             if not os.getenv("APIFY_API_TOKEN") and not os.getenv("APIFY_TOKEN"):
                 _log("Apify requires APIFY_API_TOKEN. Set it in .env or use --twitter-archive.")
             else:
-                _log("Apify fetch returned no tweets. Try --twitter-archive or check token.")
+                _log(
+                    "No tweets returned for this username. The account may be private, have no public tweets, or Twitter may be blocking timeline scraping."
+                )
+                _log(
+                    "Try: --twitter-archive with a ZIP from Twitter (Settings -> Download your data), or use a different (public) username."
+                )
             sys.exit(1)
         posts_list = list(content.iter_posts())
         _log(f"Fetched {len(posts_list)} tweets.")
@@ -369,7 +399,9 @@ def main() -> None:
         if args.input:
             _log("Input file not found. Using minimal sample.")
         else:
-            _log("No data source. Use --twitter-archive PATH, --twitter-username @user, or a text file.")
+            _log(
+                "No data source. Use --twitter-archive PATH, --twitter-username @user, or a text file."
+            )
             _log("Example: python -m holespawn.build_site --twitter-archive archive.zip")
         content = load_from_text(
             "I keep thinking about the same thing. The days blur. Memory is a trap. Nobody really knows anyone."
@@ -409,6 +441,7 @@ def main() -> None:
     model = cfg_llm.get("model", "claude-sonnet-4-20250514")
     if os.getenv("LLM_MODEL"):
         model = os.getenv("LLM_MODEL")
+
     def _cost_env(name: str, default: float) -> float:
         v = os.getenv(name)
         if v is None or not (v and str(v).strip()):
@@ -417,6 +450,7 @@ def main() -> None:
             return float(str(v).strip())
         except ValueError:
             return default
+
     warn = _cost_env("COST_WARN_THRESHOLD", float(cfg_costs.get("warn_threshold", 1.0)))
     max_cost = _cost_env("COST_MAX_THRESHOLD", float(cfg_costs.get("max_cost", 5.0)))
     rate = int(config.get("rate_limit", {}).get("calls_per_minute", 20))
@@ -427,6 +461,7 @@ def main() -> None:
     if discord_data is not None:
         _log("Building Discord profile (NLP + LLM hybrid)...")
         from holespawn.profile.discord_profile_builder import build_discord_profile
+
         profile = build_discord_profile(
             discord_data,
             use_nlp=True,
@@ -513,7 +548,9 @@ def main() -> None:
         "generated_at": datetime.now().isoformat(),
         "version": "0.1.0",
         "llm_model": model,
-        "data_source": "twitter_archive" if args.twitter_archive else ("apify" if args.twitter_username else "file"),
+        "data_source": "twitter_archive"
+        if args.twitter_archive
+        else ("apify" if args.twitter_username else "file"),
     }
     (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     (out_dir / "behavioral_matrix.json").write_text(
@@ -524,6 +561,7 @@ def main() -> None:
     if not args.no_engagement:
         try:
             from holespawn.engagement import get_engagement_brief
+
             _log("Generating binding protocol...")
             brief = get_engagement_brief(
                 content,
@@ -543,7 +581,8 @@ def main() -> None:
     # Store in DB if requested
     if getattr(args, "db", None):
         try:
-            from holespawn.db import store_profile, init_db
+            from holespawn.db import init_db, store_profile
+
             db_path = Path(args.db)
             init_db(db_path)
             run_id = store_profile(out_dir, db_path)
@@ -557,7 +596,9 @@ def main() -> None:
     if not args.quiet:
         tracker.print_summary()
     if tracker.get_cost() > tracker.max_cost:
-        _log(f"Cost ${tracker.get_cost():.2f} exceeded max ${tracker.max_cost:.2f}. Set COST_MAX_THRESHOLD to increase.")
+        _log(
+            f"Cost ${tracker.get_cost():.2f} exceeded max ${tracker.max_cost:.2f}. Set COST_MAX_THRESHOLD to increase."
+        )
         sys.exit(1)
 
     if args.deploy:

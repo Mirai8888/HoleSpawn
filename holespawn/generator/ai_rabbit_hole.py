@@ -5,12 +5,11 @@ and stream rabbit hole / ARG fragments. API key from env (never hardcoded).
 
 import os
 import time
-from typing import Iterator
+from collections.abc import Iterator
 
 from holespawn.context import build_context
 from holespawn.ingest import SocialContent
 from holespawn.profile import PsychologicalProfile
-
 
 SYSTEM_PROMPT = """You are generating a "rabbit hole" or ARG (Alternate Reality Game) narrative for artistic entertainment.
 

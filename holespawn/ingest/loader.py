@@ -3,11 +3,11 @@ Load social media content from files or raw text.
 Supports: plain text (one post per line or blank-line-separated), JSON array of posts.
 """
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Iterator
 import json
 import re
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass

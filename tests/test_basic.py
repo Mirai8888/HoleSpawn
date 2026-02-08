@@ -9,7 +9,7 @@ import pytest
 
 def test_profile_building():
     """Profile builder does not crash on basic input and returns expected keys."""
-    from holespawn.ingest import load_from_text, SocialContent
+    from holespawn.ingest import load_from_text
     from holespawn.profile import build_profile
 
     sample_posts = [
@@ -71,7 +71,7 @@ def test_site_validator():
 
 def test_config_load():
     """Config loads and has expected keys."""
-    from holespawn.config import load_config, DEFAULT_CONFIG
+    from holespawn.config import load_config
 
     config = load_config()
     assert "llm" in config
@@ -106,9 +106,9 @@ def test_cost_tracker():
 
 def test_profile_cache():
     """ProfileCache can store and retrieve profile by content hash."""
+    from holespawn.cache import ProfileCache
     from holespawn.ingest import load_from_text
     from holespawn.profile import build_profile
-    from holespawn.cache import ProfileCache
 
     content = load_from_text("post one\npost two")
     profile = build_profile(content)

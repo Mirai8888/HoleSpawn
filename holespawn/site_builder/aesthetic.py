@@ -80,4 +80,5 @@ def generate_css(profile: PsychologicalProfile, spec: Any = None) -> str:
         stacklevel=2,
     )
     from holespawn.site_builder.pure_generator import generate_design_system
+
     return generate_design_system(profile, spec)

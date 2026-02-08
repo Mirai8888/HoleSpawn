@@ -1,15 +1,33 @@
 """
-Optional Twitter ingestion via Apify (actor u6ppkMWAx2E2MpEuF).
-Requires APIFY_API_TOKEN. Returns None if no token; raises ApifyError on API failure.
+Optional Twitter ingestion via Apify. Tries multiple scrapers in order; if one
+returns no tweets, falls back to the next. Requires APIFY_API_TOKEN.
+Raises ApifyError on API failure.
 """
 
+import logging
 import os
-from pathlib import Path
+from typing import Any
 
 from holespawn.errors import ApifyError
+
 from .loader import SocialContent
 
+logger = logging.getLogger(__name__)
+
+# Primary: profile/timeline scraper (often blocked by Twitter post-2023)
 APIFY_TWITTER_ACTOR = "u6ppkMWAx2E2MpEuF"
+
+# Fallback scrapers: tried in order when primary returns 0 tweets.
+# Use pay-per-result actors (no monthly rental) so they work with standard Apify billing.
+SCRAPER_FALLBACKS = [
+    {
+        "name": "apidojo/tweet-scraper",
+        "build_input": lambda username, max_tweets: {
+            "twitterHandles": [username],
+            "maxItems": min(max_tweets, 1000),
+        },
+    },
+]
 
 
 def _reraise_apify_error(exc: Exception, username: str) -> None:
@@ -46,11 +64,36 @@ def _normalize_username(username: str) -> str:
     return (username or "").strip().lstrip("@").strip()
 
 
+def _item_to_text(item: Any) -> str:
+    """Extract tweet text from a single dataset item (works across different actor outputs)."""
+    if isinstance(item, dict):
+        return (
+            item.get("full_text")
+            or item.get("text")
+            or item.get("content")
+            or item.get("tweet")
+            or ""
+        )
+    return str(item)
+
+
+def _run_scraper(client: Any, actor_id: str, run_input: dict) -> list[str]:
+    """Run one Apify actor and return list of tweet texts. Raises on API error."""
+    run = client.actor(actor_id).call(run_input=run_input)
+    items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+    posts = []
+    for item in items:
+        text = _item_to_text(item).strip()
+        if text:
+            posts.append(text)
+    return posts
+
+
 def fetch_twitter_apify(username: str, max_tweets: int = 500) -> SocialContent | None:
     """
-    Fetch tweets for a Twitter user via Apify actor u6ppkMWAx2E2MpEuF.
-    Requires APIFY_API_TOKEN in environment (or .env). Returns None if no token
-    or on failure (graceful).
+    Fetch tweets for a Twitter user via Apify. Tries the primary actor first; if it
+    returns no tweets (e.g. profile behind login), tries fallback scrapers in order.
+    Requires APIFY_API_TOKEN. Returns None if no token or if all scrapers return no tweets.
     """
     token = os.getenv("APIFY_API_TOKEN") or os.getenv("APIFY_TOKEN")
     if not token:
@@ -64,20 +107,40 @@ def fetch_twitter_apify(username: str, max_tweets: int = 500) -> SocialContent |
         return None
 
     client = ApifyClient(token)
-    try:
-        run = client.actor(APIFY_TWITTER_ACTOR).call(
-            run_input={"handles": [username], "maxTweets": max_tweets},
-        )
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-    except Exception as e:
-        _reraise_apify_error(e, username)
+    primary_input = {"handles": [username], "maxTweets": max_tweets}
 
-    posts = []
-    for item in items:
-        if isinstance(item, dict):
-            text = item.get("full_text") or item.get("text") or item.get("content") or ""
-        else:
-            text = str(item)
-        if text and text.strip():
-            posts.append(text.strip())
-    return SocialContent(posts=posts, raw_text="\n".join(posts)) if posts else None
+    # 1) Primary scraper
+    try:
+        posts = _run_scraper(client, APIFY_TWITTER_ACTOR, primary_input)
+        if posts:
+            return SocialContent(posts=posts, raw_text="\n".join(posts))
+        logger.info(
+            "Primary Twitter scraper returned no tweets for @%s, trying fallbacks...",
+            username,
+        )
+    except Exception as e:
+        logger.warning(
+            "Primary Twitter scraper failed for @%s: %s. Trying fallbacks...",
+            username,
+            e,
+        )
+
+    # 2) Fallback scrapers
+    for cfg in SCRAPER_FALLBACKS:
+        name = cfg["name"]
+        try:
+            run_input = cfg["build_input"](username, max_tweets)
+            posts = _run_scraper(client, name, run_input)
+            if posts:
+                logger.info(
+                    "Fallback scraper %s returned %d tweets for @%s",
+                    name,
+                    len(posts),
+                    username,
+                )
+                return SocialContent(posts=posts, raw_text="\n".join(posts))
+        except Exception as e:
+            logger.warning("Fallback %s failed for @%s: %s", name, username, e)
+            continue
+
+    return None

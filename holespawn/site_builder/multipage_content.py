@@ -5,7 +5,7 @@ Self-reinforcing loop: each page introduces more complexity, not answers. No res
 
 import json
 import re
-from typing import Any, Optional
+from typing import Any
 
 from holespawn.context import build_context
 from holespawn.cost_tracker import CostTracker
@@ -136,9 +136,9 @@ def generate_multipage_content(
     profile: PsychologicalProfile,
     spec: ExperienceSpec,
     *,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> dict[str, Any]:
     """
@@ -161,12 +161,20 @@ def generate_multipage_content(
     intimacy = getattr(profile, "conversational_intimacy", "")
     discord_block = ""
     if tribal or reaction_triggers or intimacy:
-        discord_block = """
+        discord_block = (
+            """
 Discord context (if available — use for deeper personalization; content should feel like it understands their Discord presence, not just public persona):
-- Servers / community themes: """ + (", ".join(tribal) if tribal else "N/A") + """
-- Themes they react to emotionally: """ + (", ".join(reaction_triggers) if reaction_triggers else "N/A") + """
-- Conversational intimacy: """ + (intimacy or "N/A") + """. Mirror their actual conversational patterns from messages. Reference server-specific context subtly. Use language/references from their community.
+- Servers / community themes: """
+            + (", ".join(tribal) if tribal else "N/A")
+            + """
+- Themes they react to emotionally: """
+            + (", ".join(reaction_triggers) if reaction_triggers else "N/A")
+            + """
+- Conversational intimacy: """
+            + (intimacy or "N/A")
+            + """. Mirror their actual conversational patterns from messages. Reference server-specific context subtly. Use language/references from their community.
 """
+        )
     user_content = f"""Voice guide:
 {voice_guide}
 
@@ -177,8 +185,8 @@ INFINITE RABBIT HOLE — no resolution, only deeper questions.
 
 Their profile:
 - Browsing style: {browsing}. Communication style: {comm}.
-- Anxiety triggers / pet peeves: {', '.join(pet_peeves) if pet_peeves else 'N/A'}
-- Obsessions: {', '.join(obsessions)}. Specific interests: {', '.join(interests)}
+- Anxiety triggers / pet peeves: {", ".join(pet_peeves) if pet_peeves else "N/A"}
+- Obsessions: {", ".join(obsessions)}. Specific interests: {", ".join(interests)}
 
 Hook/ending rules for this type:
 {hook_templates}
@@ -210,7 +218,9 @@ Output the JSON only."""
         entries = data.get("entries", [])
         index_title = data.get("index_title", spec.title)
         while len(entries) < len(items):
-            entries.append({"title": items[len(entries)].get("title", ""), "body": "", "related": []})
+            entries.append(
+                {"title": items[len(entries)].get("title", ""), "body": "", "related": []}
+            )
         items = items[: len(entries)]
         for i in range(len(items)):
             it = items[i].copy() if isinstance(items[i], dict) else {}

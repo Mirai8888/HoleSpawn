@@ -3,14 +3,13 @@ Hybrid Discord profile builder: NLP (extraction) → LLM (synthesis) → Psychol
 Orchestrates NLP analysis and optional LLM synthesis; merges with base profile from analyzer.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import load_from_discord
-from holespawn.profile import PsychologicalProfile, build_profile
-from holespawn.profile.analyzer import _extract_discord_signals
-from holespawn.profile.discord_synthesizer import DiscordLLMSynthesizer
 from holespawn.nlp.discord_analyzer import DiscordNLPAnalyzer
+from holespawn.profile import PsychologicalProfile, build_profile
+from holespawn.profile.discord_synthesizer import DiscordLLMSynthesizer
 
 
 def _sample_representative_messages(discord_data: dict, max_per_server: int = 5) -> dict:
@@ -37,10 +36,10 @@ def build_discord_profile(
     use_nlp: bool = True,
     use_llm: bool = True,
     use_local: bool = False,
-    local_preset: Optional[str] = None,
-    api_base: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    local_preset: str | None = None,
+    api_base: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
 ) -> PsychologicalProfile:
     """
     Build a psychological profile from Discord export using NLP + optional LLM.
@@ -94,7 +93,11 @@ def build_discord_profile(
         if net_analysis.get("community_role"):
             role = net_analysis["community_role"]
             if role in ("hub", "bridge", "peripheral"):
-                profile.community_role = "leader" if role == "hub" else ("lurker" if role == "peripheral" else "participant")
+                profile.community_role = (
+                    "leader"
+                    if role == "hub"
+                    else ("lurker" if role == "peripheral" else "participant")
+                )
 
     if use_llm and (nlp_results or discord_data.get("messages")):
         synthesizer = DiscordLLMSynthesizer(
@@ -104,7 +107,9 @@ def build_discord_profile(
         )
         raw_samples = _sample_representative_messages(discord_data)
         psychology = synthesizer.synthesize_psychology(
-            nlp_analysis=nlp_results if nlp_results else {"messages": {}, "reactions": {}, "servers": {}, "network": {}, "topics": {}},
+            nlp_analysis=nlp_results
+            if nlp_results
+            else {"messages": {}, "reactions": {}, "servers": {}, "network": {}, "topics": {}},
             raw_samples=raw_samples,
             tracker=tracker,
         )

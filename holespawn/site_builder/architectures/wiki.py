@@ -4,13 +4,14 @@ Wiki-style architecture: interconnected articles with heavy hyperlinking (deep_d
 
 import json
 import re
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from holespawn.experience import ExperienceSpec
 from holespawn.ingest import SocialContent
 from holespawn.profile import PsychologicalProfile
 
-from .base import BaseArchitecture, ArchitectureConfig
+from .base import ArchitectureConfig, BaseArchitecture
 
 
 def _slug(s: str) -> str:
@@ -60,9 +61,9 @@ class WikiArchitecture(BaseArchitecture):
         call_llm: Callable[..., str],
         context_str: str,
         voice_guide: str,
-        tracker: Optional[Any] = None,
-        provider: Optional[str] = None,
-        model: Optional[str] = None,
+        tracker: Any | None = None,
+        provider: str | None = None,
+        model: str | None = None,
         calls_per_minute: int = 20,
     ) -> dict[str, dict[str, Any]]:
         """Build wiki: index (hub) + one article per topic; each article has embedded <a href>."""
@@ -85,14 +86,14 @@ Profile and narrative (excerpt):
 
 TASK: Generate a WIKI-SYLE site with {len(topics)} interconnected articles.
 
-Available page filenames (use these EXACTLY in hrefs): {', '.join(available_pages)}
+Available page filenames (use these EXACTLY in hrefs): {", ".join(available_pages)}
 
-Topics to create one article each: {', '.join(topics)}
+Topics to create one article each: {", ".join(topics)}
 
 For EACH topic, return one object in "articles" array:
 - title: Article title (use their vocabulary)
 - content: HTML with <p> paragraphs. You MUST include at least 5 <a href="SOMEPAGE.html">anchor</a> links per article. Link to OTHER topics from the list. Example: <p>This relates to <a href="{slugs[1] if len(slugs) > 1 else slugs[0]}.html">concept</a>.</p>
-- see_also: 3-5 other topic slugs (from the list: {', '.join(slugs)})
+- see_also: 3-5 other topic slugs (from the list: {", ".join(slugs)})
 
 Also return:
 - index_title: Portal title (in their voice)
@@ -129,12 +130,17 @@ Output JSON only:
         graph: dict[str, dict[str, Any]] = {}
         cards = []
         for i, art in enumerate(articles[: len(topics)]):
-            slug = art.get("topic_slug", slugs[i]) if i < len(slugs) else slugs[min(i, len(slugs) - 1)]
+            slug = (
+                art.get("topic_slug", slugs[i]) if i < len(slugs) else slugs[min(i, len(slugs) - 1)]
+            )
             title = art.get("title", topics[i] if i < len(topics) else slug)
             body = art.get("content", "")
             see_also = art.get("see_also", [])
             # Ensure .html in see_also hrefs
-            related_links = [{"href": f"{_slug(s)}.html", "title": s.replace("_", " ").title()} for s in see_also[:6]]
+            related_links = [
+                {"href": f"{_slug(s)}.html", "title": s.replace("_", " ").title()}
+                for s in see_also[:6]
+            ]
             graph[slug] = {
                 "type": "article",
                 "title": title,
@@ -142,7 +148,14 @@ Output JSON only:
                 "see_also": related_links,
                 "back_link": "index.html",
             }
-            cards.append({"id": slug, "title": title, "description": f"Explore {title}.", "href": f"{slug}.html"})
+            cards.append(
+                {
+                    "id": slug,
+                    "title": title,
+                    "description": f"Explore {title}.",
+                    "href": f"{slug}.html",
+                }
+            )
 
         graph["index"] = {
             "type": "hub",

@@ -7,7 +7,7 @@ import html
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from holespawn.experience import ExperienceSpec
 from holespawn.profile import PsychologicalProfile
@@ -75,7 +75,9 @@ class MultiPageSiteBuilder:
             html_str = hub_spoke_page(
                 self.spec.title,
                 self.spec.tagline,
-                index_data.get("cards", [{"id": "start", "title": "Start", "description": "Begin here."}]),
+                index_data.get(
+                    "cards", [{"id": "start", "title": "Start", "description": "Begin here."}]
+                ),
                 self.spec,
             )
         (output_dir / "index.html").write_text(html_str, encoding="utf-8")
@@ -100,7 +102,9 @@ class MultiPageSiteBuilder:
                 infobox = data.get("infobox", "")
                 html_str = wiki_article_page(
                     title,
-                    main_content if main_content.strip().startswith("<") else f"<p>{html.escape(main_content)}</p>",
+                    main_content
+                    if main_content.strip().startswith("<")
+                    else f"<p>{html.escape(main_content)}</p>",
                     see_also,
                     self.spec,
                     infobox=infobox,

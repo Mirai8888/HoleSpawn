@@ -38,7 +38,9 @@ def build_context(content: SocialContent, profile: PsychologicalProfile) -> str:
     peeves = _get_profile_attr(profile, "pet_peeves", [])
     lines.append("## Voice & communication")
     lines.append(f"Communication style: {comm}")
-    lines.append(f"Vocabulary sample (use these words): {', '.join(vocab[:25]) if vocab else 'N/A'}")
+    lines.append(
+        f"Vocabulary sample (use these words): {', '.join(vocab[:25]) if vocab else 'N/A'}"
+    )
     lines.append(f"Emoji usage: {emoji}")
     lines.append(f"Sentence structure: {sent_struct}")
     if cultural:

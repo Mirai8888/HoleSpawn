@@ -7,7 +7,6 @@ Optional validation + retry with feedback when content doesn't match profile.
 import json
 import logging
 import re
-from typing import Optional
 
 from holespawn.config import load_config
 from holespawn.context import build_context
@@ -178,9 +177,9 @@ def get_site_content(
     profile: PsychologicalProfile,
     spec: ExperienceSpec,
     *,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    tracker: Optional[CostTracker] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
 ) -> list[dict]:
     """Generate section content (narrative + puzzle copy) from spec + profile; voice-matched.
@@ -193,14 +192,17 @@ def get_site_content(
 
     context = build_context(content, profile)
     voice_guide = _build_voice_guide(profile)
-    spec_blob = json.dumps({
-        "aesthetic": spec.aesthetic,
-        "experience_type": spec.experience_type,
-        "tone": spec.tone,
-        "title": spec.title,
-        "tagline": spec.tagline,
-        "sections": [{"id": s.id, "name": s.name, "type": s.type} for s in spec.sections],
-    }, indent=2)
+    spec_blob = json.dumps(
+        {
+            "aesthetic": spec.aesthetic,
+            "experience_type": spec.experience_type,
+            "tone": spec.tone,
+            "title": spec.title,
+            "tagline": spec.tagline,
+            "sections": [{"id": s.id, "name": s.name, "type": s.type} for s in spec.sections],
+        },
+        indent=2,
+    )
 
     base_user_content = (
         f"{voice_guide}\n\n"

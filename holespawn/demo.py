@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from holespawn.generator import AIRabbitHoleGenerator, RabbitHoleGenerator
 from holespawn.ingest import load_from_file, load_from_text
 from holespawn.profile import build_profile
-from holespawn.generator import RabbitHoleGenerator, AIRabbitHoleGenerator
 
 
 def main():
@@ -41,13 +41,15 @@ def main():
         help="Force provider (default: Anthropic if ANTHROPIC_API_KEY set, else OpenAI, else Google).",
     )
     parser.add_argument(
-        "-n", "--count",
+        "-n",
+        "--count",
         type=int,
         default=None,
         help="Max number of fragments to emit (default: infinite until Ctrl+C).",
     )
     parser.add_argument(
-        "-i", "--interval",
+        "-i",
+        "--interval",
         type=float,
         default=1.8,
         help="Seconds between fragments (default: 1.8).",
@@ -75,7 +77,12 @@ def main():
     profile = build_profile(content)
 
     if args.ai:
-        if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OPENAI_API_KEY") and not os.getenv("GOOGLE_API_KEY") and not os.getenv("GEMINI_API_KEY"):
+        if (
+            not os.getenv("ANTHROPIC_API_KEY")
+            and not os.getenv("OPENAI_API_KEY")
+            and not os.getenv("GOOGLE_API_KEY")
+            and not os.getenv("GEMINI_API_KEY")
+        ):
             print(
                 "AI mode requires an API key. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in your environment.",
                 file=sys.stderr,
@@ -83,7 +90,8 @@ def main():
             sys.exit(1)
         try:
             gen = AIRabbitHoleGenerator(
-                content, profile,
+                content,
+                profile,
                 provider=args.provider,
             )
         except ValueError as e:
