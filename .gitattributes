@@ -1,0 +1,12 @@
+# Prevent GitHub Linguist from misclassifying lock/build files as Makefile
+*.lock linguist-generated=true
+Cargo.lock linguist-generated=true
+**/Cargo.lock linguist-generated=true
+
+# Exclude build output from language stats
+target/ linguist-detectable=false
+**/target/ linguist-detectable=false
+
+# Optional: exclude other generated/output dirs from stats
+outputs/ linguist-detectable=false
+out/ linguist-detectable=false
