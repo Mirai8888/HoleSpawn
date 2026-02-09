@@ -46,6 +46,8 @@ pub enum Action {
     PrevNode,
     SelectLeft,
     SelectRight,
+    /// Open "Run pipeline" prompt (target + network y/n).
+    RunPipeline,
 }
 
 pub fn next_tab_view(v: View) -> View {
@@ -100,6 +102,7 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::BackTab => Action::PrevTab,
             KeyCode::Char('/') => Action::Search,
             KeyCode::Char('?') => Action::Help,
+            KeyCode::Char('R') => Action::RunPipeline,
             _ => Action::None,
         },
         View::Profile | View::Protocol => match code {

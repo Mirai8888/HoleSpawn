@@ -21,6 +21,7 @@ Browser:
   n           Network view
   c           Compare two profiles
   /           Search (filter list), Enter/Esc to confirm
+  R           Run pipeline (target + network y/n)
   ?           This help
   q           Quit
 

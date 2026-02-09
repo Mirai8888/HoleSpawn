@@ -8,6 +8,7 @@ mod node_detail;
 mod profile;
 mod protocol;
 mod report;
+mod run_pipeline;
 
 use crate::app::App;
 use crate::event::{active_tab_index, View};
@@ -59,5 +60,8 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
         View::Compare => compare::draw(frame, app, content),
         View::Live => live::draw(frame, app, content),
         View::Help => browser::draw(frame, app, content),
+    }
+    if let Some(ref rp) = app.run_pipeline {
+        run_pipeline::draw(frame, rp, content);
     }
 }

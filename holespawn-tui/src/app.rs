@@ -5,6 +5,24 @@ use crate::event::{handle_key, next_tab_view, prev_tab_view, Action, View};
 use crate::types::{NetworkAnalysis, ProfileEntry};
 use std::path::PathBuf;
 
+/// State for "Run pipeline" flow: target input -> network y/n -> spawn.
+#[derive(Debug, Clone)]
+pub enum RunPipelineStep {
+    /// User is typing target (Twitter @username).
+    TargetInput,
+    /// Ask: Network? (y/n).
+    NetworkConfirm,
+    /// Pipeline started; message to show; Esc to close.
+    Started(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct RunPipelineState {
+    pub step: RunPipelineStep,
+    pub target: String,
+    pub want_network: Option<bool>,
+}
+
 pub struct App {
     pub profiles: Vec<ProfileEntry>,
     pub selected_index: usize,
@@ -20,6 +38,8 @@ pub struct App {
     pub selected_node_index: Option<usize>,
     pub search_mode: bool,
     pub search_query: String,
+    /// When Some, we're in the "Run pipeline" prompt flow (modal).
+    pub run_pipeline: Option<RunPipelineState>,
 }
 
 impl App {
@@ -39,6 +59,7 @@ impl App {
             selected_node_index: None,
             search_mode: false,
             search_query: String::new(),
+            run_pipeline: None,
         }
     }
 
@@ -246,13 +267,112 @@ impl App {
                     self.compare_right = Some((idx + 1) % self.profiles.len());
                 }
             }
+            Action::RunPipeline => {
+                self.run_pipeline = Some(RunPipelineState {
+                    step: RunPipelineStep::TargetInput,
+                    target: String::new(),
+                    want_network: None,
+                });
+            }
             Action::CycleCommunity => {}
             Action::None => {}
         }
         quit
     }
 
+    /// Spawn the HoleSpawn Python pipeline. Returns a message for the user.
+    pub fn spawn_pipeline(&self, target: &str, want_network: bool) -> String {
+        let target = target.trim().trim_start_matches('@');
+        if target.is_empty() {
+            return "Target is empty. Enter a Twitter username (e.g. user or @user).".to_string();
+        }
+        let username = format!("@{}", target);
+        let repo_root = self.repo_root();
+        let mut cmd = std::process::Command::new("python");
+        cmd.arg("-m")
+            .arg("holespawn.build_site")
+            .arg("--twitter-username")
+            .arg(&username)
+            .arg("--consent-acknowledged");
+        if want_network {
+            cmd.arg("--network");
+        }
+        cmd.current_dir(&repo_root);
+        cmd.env_remove("PYTHONPATH"); // avoid conflicts; Python finds holespawn from repo root
+        match cmd.spawn() {
+            Ok(_) => {
+                let out_base = self
+                    .live_path
+                    .as_deref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "outputs".to_string());
+                format!(
+                    "Pipeline started for {} (network: {}).\nOutput: {} — check Live tab.",
+                    username,
+                    if want_network { "yes" } else { "no" },
+                    out_base
+                )
+            }
+            Err(e) => format!("Failed to start pipeline: {}. Is Python in PATH?", e),
+        }
+    }
+
+    /// Project root (parent of holespawn-tui if cwd is holespawn-tui).
+    fn repo_root(&self) -> PathBuf {
+        match std::env::current_dir() {
+            Ok(cwd) => {
+                if cwd.file_name().and_then(|n| n.to_str()) == Some("holespawn-tui") {
+                    cwd.parent().unwrap_or(&cwd).to_path_buf()
+                } else {
+                    cwd
+                }
+            }
+            _ => PathBuf::from("."),
+        }
+    }
+
     pub fn on_key(&mut self, key: crossterm::event::KeyEvent) -> bool {
+        if let Some(mut rp) = self.run_pipeline.take() {
+            use crate::app::RunPipelineStep;
+            use crossterm::event::KeyCode;
+            let mut put_back = true;
+            match &rp.step {
+                RunPipelineStep::TargetInput => match key.code {
+                    KeyCode::Char(c) => rp.target.push(c),
+                    KeyCode::Backspace => {
+                        rp.target.pop();
+                    }
+                    KeyCode::Enter => {
+                        rp.step = RunPipelineStep::NetworkConfirm;
+                    }
+                    KeyCode::Esc => put_back = false,
+                    _ => {}
+                },
+                RunPipelineStep::NetworkConfirm => match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        let target = rp.target.clone();
+                        let msg = self.spawn_pipeline(&target, true);
+                        rp.step = RunPipelineStep::Started(msg);
+                    }
+                    KeyCode::Char('n') | KeyCode::Char('N') => {
+                        let target = rp.target.clone();
+                        let msg = self.spawn_pipeline(&target, false);
+                        rp.step = RunPipelineStep::Started(msg);
+                    }
+                    KeyCode::Esc => put_back = false,
+                    _ => {}
+                },
+                RunPipelineStep::Started(_) => {
+                    if key.code == KeyCode::Esc {
+                        put_back = false;
+                    }
+                }
+            }
+            if put_back {
+                self.run_pipeline = Some(rp);
+            }
+            return false;
+        }
         if self.search_mode && self.view == View::Browser {
             match key.code {
                 crossterm::event::KeyCode::Char(c) => {

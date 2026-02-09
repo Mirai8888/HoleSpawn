@@ -85,7 +85,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from("(No behavioral_matrix.json)"));
         }
         lines.push(Line::from(""));
-        lines.push(Line::from("[Enter] Full profile  [b] Binding protocol  [n] Network  [c] Compare  [ / ] Search"));
+        lines.push(Line::from("[Enter] profile  [b] protocol  [n] Network  [c] Compare  [ / ] Search  [R] Run pipeline"));
         let paragraph = Paragraph::new(lines);
         frame.render_widget(paragraph, preview);
     }
