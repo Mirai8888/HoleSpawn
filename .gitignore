@@ -22,9 +22,19 @@ build/
 # Generated site output (do not commit)
 output/
 outputs/
+out/
 .cache/
 logs/
 .pytest_cache/
+
+# Rust / Cargo
+target/
+
+# Make (do not commit)
+Makefile
+makefile
+GNUmakefile
+*.mk
 
 # IDE
 .idea/
