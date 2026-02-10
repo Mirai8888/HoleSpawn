@@ -136,6 +136,15 @@ outputs/YYYYMMDD_HHMMSS_subject/
 
 **Trap Architecture:** HTML/CSS/JS modules matched to subject substrate
 
+### Delivery (tailored message)
+
+From an existing run, generate one outbound message (e.g. first DM) from the binding protocol and profile; write to file or stdout. No live send by default. See `docs/DELIVERY_DESIGN.md`.
+
+```bash
+python -m holespawn.delivery --output-dir outputs/YYYYMMDD_HHMMSS_handle --channel file --out delivery_out
+python -m holespawn.delivery --output-dir outputs/YYYYMMDD_HHMMSS_handle --channel stdout
+```
+
 ---
 
 ## METHODOLOGY DESCRIPTION
@@ -570,6 +579,8 @@ Defensive capability requires mechanism awareness.
 ---
 
 ## FIELD NOTES
+
+**Research context:** Conceptual alignment with influence-operation literature (e.g. Public Opinion Blackout / 舆论遮蔽: susceptibility screening, narrative targeting, customized cognitive delivery) is documented in `docs/RESEARCH_CONTEXT.md`. Stack models these mechanisms for defensive visibility.
 
 **Current Status:** Testing phase active
 

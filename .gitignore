@@ -27,6 +27,7 @@ build/
 output/
 outputs/
 out/
+delivery_out/
 recordings/
 recordings.db
 .cache/
@@ -52,3 +53,7 @@ GNUmakefile
 # OS
 .DS_Store
 Thumbs.db
+
+# Markdown (do not commit); keep README for repo landing
+*.md
+!README.md
