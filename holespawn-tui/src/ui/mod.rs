@@ -7,6 +7,7 @@ mod network;
 mod node_detail;
 mod profile;
 mod protocol;
+mod recording;
 mod report;
 mod run_pipeline;
 
@@ -27,7 +28,7 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(1)])
         .split(area);
-    let tab_names = ["[1] Profiles", "[2] Network", "[3] Compare", "[4] Live"];
+    let tab_names = ["[1] Profiles", "[2] Network", "[3] Compare", "[4] Live", "[5] Recording"];
     let active = active_tab_index(app.view);
     let tab_style = |i: usize| {
         if i == active {
@@ -59,6 +60,7 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
         View::NodeDetail => node_detail::draw(frame, app, content),
         View::Compare => compare::draw(frame, app, content),
         View::Live => live::draw(frame, app, content),
+        View::Recording => recording::draw(frame, app, content),
         View::Help => browser::draw(frame, app, content),
     }
     if let Some(ref rp) = app.run_pipeline {

@@ -14,6 +14,7 @@ pub enum View {
     NodeDetail,
     Compare,
     Live,
+    Recording,
     Help,
 }
 
@@ -46,6 +47,8 @@ pub enum Action {
     PrevNode,
     SelectLeft,
     SelectRight,
+    /// Delete the currently selected profile/run directory.
+    DeleteProfile,
     /// Open "Run pipeline" prompt (target + network y/n).
     RunPipeline,
 }
@@ -55,18 +58,20 @@ pub fn next_tab_view(v: View) -> View {
         View::Browser | View::Profile | View::Protocol | View::NodeDetail => View::Network,
         View::Network | View::NetworkGraph | View::NetworkReport => View::Compare,
         View::Compare => View::Live,
-        View::Live => View::Browser,
+        View::Live => View::Recording,
+        View::Recording => View::Browser,
         View::Help => View::Browser,
     }
 }
 
 pub fn prev_tab_view(v: View) -> View {
     match v {
-        View::Browser => View::Live,
+        View::Browser => View::Recording,
         View::Profile | View::Protocol | View::NodeDetail => View::Browser,
         View::Network | View::NetworkGraph | View::NetworkReport => View::Browser,
         View::Compare => View::Network,
         View::Live => View::Compare,
+        View::Recording => View::Live,
         View::Help => View::Browser,
     }
 }
@@ -77,6 +82,7 @@ pub fn active_tab_index(view: View) -> usize {
         View::Network | View::NetworkGraph | View::NetworkReport => 1,
         View::Compare => 2,
         View::Live => 3,
+        View::Recording => 4,
         View::Help => 0,
     }
 }
@@ -98,11 +104,14 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             KeyCode::Tab => Action::NextTab,
             KeyCode::BackTab => Action::PrevTab,
             KeyCode::Char('/') => Action::Search,
             KeyCode::Char('?') => Action::Help,
-            KeyCode::Char('R') => Action::RunPipeline,
+            // Use lowercase keys for ergonomics; avoid accidental repeats.
+            KeyCode::Char('r') => Action::RunPipeline,
+            KeyCode::Char('x') => Action::DeleteProfile,
             _ => Action::None,
         },
         View::Profile | View::Protocol => match code {
@@ -111,6 +120,7 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             KeyCode::Char('j') | KeyCode::Down => Action::ScrollDown,
             KeyCode::Char('k') | KeyCode::Up => Action::ScrollUp,
             KeyCode::PageDown | KeyCode::Char('d') => Action::PageDown,
@@ -125,6 +135,7 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             KeyCode::Tab => Action::CycleCommunity,
             KeyCode::Enter => Action::NodeDetail,
             KeyCode::Char('r') => Action::NetworkReport,
@@ -138,6 +149,7 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             KeyCode::Char('j') | KeyCode::Down => Action::ScrollDown,
             KeyCode::Char('k') | KeyCode::Up => Action::ScrollUp,
             KeyCode::PageDown | KeyCode::Char('d') => Action::PageDown,
@@ -150,6 +162,7 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             KeyCode::Left => Action::SelectLeft,
             KeyCode::Right => Action::SelectRight,
             KeyCode::Char('j') | KeyCode::Down => Action::ScrollDown,
@@ -162,6 +175,16 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
+            _ => Action::None,
+        },
+        View::Recording => match code {
+            KeyCode::Esc => Action::Back,
+            KeyCode::Char('1') => Action::GotoTab(0),
+            KeyCode::Char('2') => Action::GotoTab(1),
+            KeyCode::Char('3') => Action::GotoTab(2),
+            KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             _ => Action::None,
         },
         View::Help => match code {
@@ -174,6 +197,7 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             KeyCode::Char('j') | KeyCode::Down => Action::ScrollDown,
             KeyCode::Char('k') | KeyCode::Up => Action::ScrollUp,
             KeyCode::Char('g') => Action::Graph,
@@ -186,6 +210,7 @@ pub fn handle_key(key: KeyEvent, view: View) -> Action {
             KeyCode::Char('2') => Action::GotoTab(1),
             KeyCode::Char('3') => Action::GotoTab(2),
             KeyCode::Char('4') => Action::GotoTab(3),
+            KeyCode::Char('5') => Action::GotoTab(4),
             KeyCode::Char('j') | KeyCode::Down => Action::ScrollDown,
             KeyCode::Char('k') | KeyCode::Up => Action::ScrollUp,
             KeyCode::PageDown | KeyCode::Char('d') => Action::PageDown,

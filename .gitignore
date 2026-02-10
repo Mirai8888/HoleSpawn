@@ -10,6 +10,7 @@ env/
 
 # Scraper session and cache (do not commit)
 data/
+apify_dump/
 
 # Python
 __pycache__/

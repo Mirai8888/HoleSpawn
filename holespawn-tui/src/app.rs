@@ -1,8 +1,8 @@
 //! App state machine and navigation.
 
-use crate::data::{load_network, load_network_report};
+use crate::data::{fetch_recordings_summary, load_network, load_network_report};
 use crate::event::{handle_key, next_tab_view, prev_tab_view, Action, View};
-use crate::types::{NetworkAnalysis, ProfileEntry};
+use crate::types::{NetworkAnalysis, ProfileEntry, RecordingSummary};
 use std::path::PathBuf;
 
 /// State for "Run pipeline" flow: target input -> network y/n -> spawn.
@@ -26,6 +26,8 @@ pub struct RunPipelineState {
 pub struct App {
     pub profiles: Vec<ProfileEntry>,
     pub selected_index: usize,
+    /// Base directory being scanned for runs (e.g. outputs/ or out/).
+    pub base_dir: PathBuf,
     pub view: View,
     pub scroll: u16,
     pub compare_left: Option<usize>,
@@ -40,14 +42,17 @@ pub struct App {
     pub search_query: String,
     /// When Some, we're in the "Run pipeline" prompt flow (modal).
     pub run_pipeline: Option<RunPipelineState>,
+    /// Recording tab: summary of subjects from recordings.db (refreshed when entering tab).
+    pub recordings_summary: Option<Vec<RecordingSummary>>,
 }
 
 impl App {
-    pub fn new(profiles: Vec<ProfileEntry>) -> Self {
+    pub fn new(profiles: Vec<ProfileEntry>, base_dir: std::path::PathBuf) -> Self {
         let selected_index = profiles.len().saturating_sub(1).min(profiles.len());
         Self {
             selected_index: if profiles.is_empty() { 0 } else { selected_index },
             profiles,
+            base_dir,
             view: View::Browser,
             scroll: 0,
             compare_left: None,
@@ -60,7 +65,15 @@ impl App {
             search_mode: false,
             search_query: String::new(),
             run_pipeline: None,
+            recordings_summary: None,
         }
+    }
+
+    /// Refresh recording summary (run Python temporal --list-subjects). Call when entering Recording tab.
+    pub fn refresh_recordings_summary(&mut self) {
+        let repo = self.repo_root();
+        let recordings_dir = "recordings";
+        self.recordings_summary = Some(fetch_recordings_summary(&repo, recordings_dir));
     }
 
     pub fn selected_profile(&self) -> Option<&ProfileEntry> {
@@ -150,7 +163,11 @@ impl App {
             }
             Action::Live => self.view = View::Live,
             Action::NextTab => {
-                self.view = next_tab_view(self.view);
+                let next = next_tab_view(self.view);
+                if next == View::Recording {
+                    self.refresh_recordings_summary();
+                }
+                self.view = next;
                 if self.view == View::Network {
                     self.load_network_for_selected();
                 }
@@ -165,7 +182,11 @@ impl App {
                 self.scroll = 0;
             }
             Action::PrevTab => {
-                self.view = prev_tab_view(self.view);
+                let prev = prev_tab_view(self.view);
+                if prev == View::Recording {
+                    self.refresh_recordings_summary();
+                }
+                self.view = prev;
                 if self.view == View::Network {
                     self.load_network_for_selected();
                 }
@@ -198,6 +219,10 @@ impl App {
                         View::Compare
                     }
                     3 => View::Live,
+                    4 => {
+                        self.refresh_recordings_summary();
+                        View::Recording
+                    }
                     _ => self.view,
                 };
                 self.scroll = 0;
@@ -266,6 +291,26 @@ impl App {
                     let idx = self.compare_right.unwrap_or(0);
                     self.compare_right = Some((idx + 1) % self.profiles.len());
                 }
+            }
+            Action::DeleteProfile => {
+                if self.profiles.is_empty() {
+                    return quit;
+                }
+                if let Some(p) = self.selected_profile() {
+                    let _ = std::fs::remove_dir_all(&p.path);
+                }
+                // Rescan base_dir after deletion.
+                let new_profiles = crate::data::scan_output_dirs(&self.base_dir);
+                self.profiles = new_profiles;
+                if self.profiles.is_empty() {
+                    self.selected_index = 0;
+                } else if self.selected_index >= self.profiles.len() {
+                    self.selected_index = self.profiles.len() - 1;
+                }
+                self.scroll = 0;
+                self.network = None;
+                self.network_report = None;
+                self.selected_node_index = None;
             }
             Action::RunPipeline => {
                 self.run_pipeline = Some(RunPipelineState {

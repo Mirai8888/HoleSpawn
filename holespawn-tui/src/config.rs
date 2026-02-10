@@ -42,13 +42,24 @@ impl Config {
         Self::default()
     }
 
-    /// Resolve output directory: CLI override > config > default "outputs"
+    /// Resolve output directory:
+    /// 1) CLI override
+    /// 2) config file
+    /// 3) existing "outputs" or "out" directory
+    /// 4) default "outputs"
     pub fn output_dir(&self, cli_path: Option<&Path>) -> PathBuf {
         if let Some(p) = cli_path {
             return p.to_path_buf();
         }
-        self.output_dir
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("outputs"))
+        if let Some(cfg) = &self.output_dir {
+            return cfg.clone();
+        }
+        if Path::new("outputs").exists() {
+            return PathBuf::from("outputs");
+        }
+        if Path::new("out").exists() {
+            return PathBuf::from("out");
+        }
+        PathBuf::from("outputs")
     }
 }

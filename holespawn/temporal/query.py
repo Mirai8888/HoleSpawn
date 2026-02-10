@@ -34,3 +34,27 @@ def list_recordings(
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
+
+
+def list_subjects(
+    db_path: str | Path,
+    *,
+    source_type: str | None = None,
+) -> list[str]:
+    """
+    Return distinct subject_ids that have at least one recording.
+    Useful for TUI Recording tab and batch temporal runs.
+    """
+    path = Path(db_path)
+    if not path.is_file():
+        return []
+    conn = sqlite3.connect(str(path))
+    cur = conn.execute(
+        "SELECT DISTINCT subject_id FROM recordings"
+        + (" WHERE source_type = ?" if source_type else "")
+        + " ORDER BY subject_id",
+        (source_type,) if source_type else (),
+    )
+    out = [row[0] for row in cur.fetchall()]
+    conn.close()
+    return out

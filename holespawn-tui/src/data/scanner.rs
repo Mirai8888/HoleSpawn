@@ -20,9 +20,14 @@ fn parse_dir_name(name: &str) -> Option<(String, String)> {
     None
 }
 
+/// True if this directory has a binding file (binding.md or binding_protocol.md).
+fn has_binding(path: &Path) -> bool {
+    path.join("binding.md").exists() || path.join("binding_protocol.md").exists()
+}
+
 /// If base_path itself contains behavioral_matrix.json, treat it as a single profile.
 fn try_single_dir(base: &Path) -> Option<ProfileEntry> {
-    if !base.join("behavioral_matrix.json").exists() {
+    if !base.join("behavioral_matrix.json").exists() || !has_binding(base) {
         return None;
     }
     let name = base
@@ -65,12 +70,21 @@ pub fn scan_output_dirs(base_path: &Path) -> Vec<ProfileEntry> {
             continue;
         }
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        // Skip temporary "profiles" aggregate directory.
+        if name == "profiles" {
+            continue;
+        }
         let (timestamp, username) = match parse_dir_name(name) {
             Some(p) => p,
             None => continue,
         };
+        if !has_binding(&path) {
+            continue;
+        }
         let matrix = load_matrix(&path);
-        let protocol = std::fs::read_to_string(path.join("binding_protocol.md")).ok();
+        let protocol = std::fs::read_to_string(path.join("binding_protocol.md"))
+            .or_else(|_| std::fs::read_to_string(path.join("binding.md")))
+            .ok();
         let has_network = path.join("network_analysis.json").exists();
         entries.push(ProfileEntry {
             dir_name: name.to_string(),
@@ -83,5 +97,8 @@ pub fn scan_output_dirs(base_path: &Path) -> Vec<ProfileEntry> {
         });
     }
     entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    // Deduplicate by username (case-insensitive), keeping newest (first after sort).
+    let mut seen = std::collections::HashSet::new();
+    entries.retain(|e| seen.insert(e.username.to_lowercase()));
     entries
 }

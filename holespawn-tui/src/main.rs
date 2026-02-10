@@ -37,7 +37,23 @@ fn main() -> io::Result<()> {
     let mut args = std::env::args().skip(1);
     let output_path: Option<PathBuf> = args.next().map(PathBuf::from);
     let config = Config::load();
-    let base = config.output_dir(output_path.as_deref());
+    let mut base = config.output_dir(output_path.as_deref());
+
+    // If we're running from the holespawn-tui subdirectory and the resolved
+    // base doesn't exist, fall back to the parent repo root + base.
+    if !base.exists() {
+        if let Ok(cwd) = std::env::current_dir() {
+            if cwd.file_name().and_then(|n| n.to_str()) == Some("holespawn-tui") {
+                let candidate = cwd
+                    .parent()
+                    .map(|p| p.join(&base))
+                    .unwrap_or_else(|| base.clone());
+                if candidate.exists() {
+                    base = candidate;
+                }
+            }
+        }
+    }
 
     let profiles = if base.exists() {
         scan_output_dirs(&base)
@@ -45,7 +61,7 @@ fn main() -> io::Result<()> {
         Vec::new()
     };
 
-    let mut app = App::new(profiles);
+    let mut app = App::new(profiles, base.clone());
     app.live_path = Some(base.canonicalize().unwrap_or(base));
 
     let mut stdout = stdout();

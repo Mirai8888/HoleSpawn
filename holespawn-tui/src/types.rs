@@ -38,6 +38,18 @@ pub struct BehavioralMatrix {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
+/// Recording summary for one subject (from `python -m holespawn.temporal --list-subjects`).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RecordingSummary {
+    #[serde(default)]
+    pub subject_id: String,
+    pub last_timestamp: Option<String>,
+    #[serde(default)]
+    pub snapshot_count: u64,
+    #[serde(default)]
+    pub record_count: u64,
+}
+
 /// One profile entry (one output directory).
 #[derive(Debug, Clone)]
 pub struct ProfileEntry {

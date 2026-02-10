@@ -41,9 +41,27 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let list = List::new(list_items).highlight_style(Style::default().bg(Color::DarkGray));
     frame.render_stateful_widget(list, inner, &mut state);
 
-    // Right pane: preview of selected profile
+    // Right pane: preview of selected profile, or onboarding if none.
     let preview = chunks[1].inner(&margin);
-    if let Some(p) = app.selected_profile() {
+    if app.profiles.is_empty() {
+        let mut lines = vec![
+            Line::from("No runs found yet.").style(Style::default().fg(Color::Yellow)),
+            Line::from(""),
+            Line::from("This TUI scans generated runs under:"),
+            Line::from("  - outputs/   (default)"),
+            Line::from("  - out/       (if present)"),
+            Line::from(""),
+            Line::from("To start a new run from here:").style(Style::default().fg(Color::Cyan)),
+            Line::from("  r / R   Run pipeline (enter X handle, then choose network y/n)"),
+            Line::from(""),
+            Line::from("Or run pipeline manually, then restart TUI:"),
+            Line::from("  python -m holespawn.build_site --twitter-username @user --network"),
+            Line::from(""),
+            Line::from("[?] Help  [q] Quit"),
+        ];
+        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: true });
+        frame.render_widget(paragraph, preview);
+    } else if let Some(p) = app.selected_profile() {
         let mut lines = vec![
             Line::from("Behavioral Matrix").style(Style::default().fg(Color::Cyan)),
             Line::from(""),
@@ -85,7 +103,9 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from("(No behavioral_matrix.json)"));
         }
         lines.push(Line::from(""));
-        lines.push(Line::from("[Enter] profile  [b] protocol  [n] Network  [c] Compare  [ / ] Search  [R] Run pipeline"));
+        lines.push(Line::from(
+            "[Enter] Profile   [b] Protocol   [n] Network   [c] Compare   [/ ] Search   [r] Run pipeline   [x] Delete run",
+        ));
         let paragraph = Paragraph::new(lines);
         frame.render_widget(paragraph, preview);
     }

@@ -76,11 +76,26 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(format!("Watching: {}", path.display())),
         Line::from(""),
         Line::from("Pipeline stages (from file presence):").style(Style::default().fg(Color::Cyan)),
-        Line::from(format!("  behavioral_matrix.json  {}", stage_status(path, "behavioral_matrix.json"))),
-        Line::from(format!("  binding_protocol.md     {}", stage_status(path, "binding_protocol.md"))),
-        Line::from(format!("  trap_architecture/      {}", stage_status(path, "trap_architecture"))),
-        Line::from(format!("  network_analysis.json   {}", stage_status(path, "network_analysis.json"))),
-        Line::from(format!("  network_report.md       {}", stage_status(path, "network_report.md"))),
+        Line::from(format!(
+            "  behavioral_matrix.json  {}",
+            stage_status(&path, "behavioral_matrix.json")
+        )),
+        Line::from(format!(
+            "  binding_protocol.md     {}",
+            stage_status(&path, "binding_protocol.md")
+        )),
+        Line::from(format!(
+            "  trap_architecture/      {}",
+            stage_status(&path, "trap_architecture")
+        )),
+        Line::from(format!(
+            "  network_analysis.json   {}",
+            stage_status(&path, "network_analysis.json")
+        )),
+        Line::from(format!(
+            "  network_report.md       {}",
+            stage_status(&path, "network_report.md")
+        )),
         Line::from(""),
     ];
 

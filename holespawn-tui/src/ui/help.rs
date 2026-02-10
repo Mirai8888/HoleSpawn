@@ -21,9 +21,14 @@ Browser:
   n           Network view
   c           Compare two profiles
   /           Search (filter list), Enter/Esc to confirm
-  R           Run pipeline (target + network y/n)
+  r           Run pipeline (enter X handle, then network y/n)
+  x           Delete selected run directory (permanently)
   ?           This help
   q           Quit
+
+Profiles list:
+  - Shows completed runs discovered under outputs/ or out/.
+  - Each entry is a timestamped directory from the Python pipeline.
 
 Profile / Protocol / Network / Report:
   Esc         Back

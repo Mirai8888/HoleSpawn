@@ -359,6 +359,11 @@ Examples:
         action="store_true",
         help="When using --network: skip cost estimate / Proceed? prompt (for scripted use).",
     )
+    parser.add_argument(
+        "--profile-only",
+        action="store_true",
+        help="Run pipeline without generating the website: write behavioral_matrix.json, binding_protocol.md, metadata, cost_breakdown; skip trap_architecture/ and site validation.",
+    )
     return parser
 
 
@@ -467,15 +472,19 @@ def main() -> None:
         sys.exit(1)
 
     # Output directory
+    profile_only = getattr(args, "profile_only", False)
     if args.output:
         out_dir = Path(args.output)
         out_dir.mkdir(parents=True, exist_ok=True)
         site_dir = out_dir / "trap_architecture"
-        site_dir.mkdir(exist_ok=True)
+        if not profile_only:
+            site_dir.mkdir(exist_ok=True)
         use_organized = False
     else:
         base_dir = config.get("output", {}).get("base_dir", "outputs")
-        out_dir = _create_output_dir(username, base_dir=base_dir, use_site_subdir=True)
+        out_dir = _create_output_dir(
+            username, base_dir=base_dir, use_site_subdir=not profile_only
+        )
         site_dir = out_dir / "trap_architecture"
         use_organized = True
         if not args.quiet:
@@ -532,8 +541,10 @@ def main() -> None:
             profile = build_profile(content)
             cache.set(posts_list, profile)
 
-    # Pure generation (no templates) vs legacy single-page
-    if args.single_page:
+    # Pure generation (no templates) vs legacy single-page (skip when --profile-only)
+    if profile_only:
+        _log("Profile-only run: skipping site generation.")
+    elif args.single_page:
         # Legacy path: experience spec → section content → fill template
         _log("Generating experience spec...")
         try:
@@ -585,10 +596,11 @@ def main() -> None:
             _log(f"Pure generation failed: {e}")
             sys.exit(1)
 
-    # Validate
-    validator = SiteValidator(site_dir)
-    if not validator.validate_all():
-        _log("Site validation issues: " + "; ".join(validator.get_errors()))
+    # Validate (skip when profile-only)
+    if not profile_only and site_dir.exists():
+        validator = SiteValidator(site_dir)
+        if not validator.validate_all():
+            _log("Site validation issues: " + "; ".join(validator.get_errors()))
 
     # Metadata and profile (always write when we have out_dir)
     metadata = {
@@ -675,7 +687,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    if args.deploy:
+    if args.deploy and not profile_only and site_dir.exists():
         _deploy(site_dir)
 
     if not args.quiet:
