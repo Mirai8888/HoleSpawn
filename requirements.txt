@@ -16,6 +16,9 @@ anthropic>=0.39.0
 openai>=1.0.0
 google-genai>=0.5.0
 
+# Optional: Apify managed scrapers (live fetch)
+apify-client>=1.6.0
+
 # Self-hosted X/Twitter scraper (Playwright). Run: playwright install chromium
 playwright>=1.40
 

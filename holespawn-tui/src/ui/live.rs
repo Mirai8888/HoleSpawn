@@ -46,11 +46,31 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(&block, area);
     let inner = block.inner(area).inner(&margin);
 
-    let path = app
+    // Base path comes from:
+    // - app.live_path (typically the outputs/ root when launched)
+    // - or the selected profile directory
+    // - or "." as a last resort.
+    let mut path = app
         .live_path
         .as_deref()
         .or_else(|| app.selected_profile().map(|p| p.path.as_path()))
-        .unwrap_or(Path::new("."));
+        .unwrap_or(Path::new("."))
+        .to_path_buf();
+
+    // If we're pointed at the outputs/ root, follow latest.txt to the most recent run
+    // so that stage_status() checks the actual pipeline directory.
+    let latest = path.join("latest.txt");
+    if latest.exists() && path.join("behavioral_matrix.json").exists() == false {
+        if let Ok(name) = std::fs::read_to_string(&latest) {
+            let dir = name.trim();
+            if !dir.is_empty() {
+                let candidate = path.join(dir);
+                if candidate.is_dir() {
+                    path = candidate;
+                }
+            }
+        }
+    }
 
     let mut lines: Vec<Line> = vec![
         Line::from(format!("Watching: {}", path.display())),

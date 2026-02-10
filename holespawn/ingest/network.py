@@ -8,6 +8,7 @@ Without step 3 the graph is a useless star. Outputs NetworkData for analysis.
 
 import json
 import logging
+import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -53,6 +54,70 @@ def _fetch_followers_scraper(username: str, max_results: int = 2000) -> list[str
     except Exception as e:
         logger.warning("Followers fetch failed for @%s: %s", username, e)
         return []
+
+
+def _fetch_followers_apify(username: str, max_results: int = 2000) -> list[str]:
+    """Fetch followers list via Apify. Returns [] if no token or actor fails."""
+    token = os.getenv("APIFY_API_TOKEN") or os.getenv("APIFY_TOKEN")
+    if not token:
+        return []
+    username = _normalize_username(username)
+    if not username:
+        return []
+    actor = os.getenv("APIFY_FOLLOWERS_ACTOR") or "powerai/twitter-followers-scraper"
+    try:
+        from apify_client import ApifyClient
+    except Exception:
+        return []
+    try:
+        client = ApifyClient(token)
+        run_input = {"screenname": username, "maxResults": min(max_results, 5000)}
+        run = client.actor(actor).call(run_input=run_input)
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+    except Exception as e:
+        logger.warning("Followers fetch (Apify) failed for @%s: %s", username, e)
+        return []
+    handles: list[str] = []
+    for item in items:
+        if isinstance(item, dict):
+            h = item.get("screen_name") or item.get("username") or item.get("handle") or item.get("screenName")
+            if h:
+                handles.append(str(h).strip().lstrip("@"))
+        elif isinstance(item, str):
+            handles.append(item.strip().lstrip("@"))
+    return handles[:max_results]
+
+
+def _fetch_tweet_items_apify(username: str, max_tweets: int = 500) -> list[dict[str, Any]]:
+    """Fetch raw tweet items for interaction parsing via Apify (if token available)."""
+    token = os.getenv("APIFY_API_TOKEN") or os.getenv("APIFY_TOKEN")
+    if not token:
+        return []
+    username = _normalize_username(username)
+    if not username:
+        return []
+    try:
+        from holespawn.ingest.apify_twitter import APIFY_TWITTER_ACTOR, SCRAPER_FALLBACKS, _run_apify_raw
+        from apify_client import ApifyClient
+    except Exception:
+        return []
+    client = ApifyClient(token)
+    primary_input = {"handles": [username], "maxTweets": max_tweets}
+    try:
+        items = _run_apify_raw(client, APIFY_TWITTER_ACTOR, primary_input)
+        if items:
+            return [i for i in items if isinstance(i, dict)]
+    except Exception:
+        pass
+    for cfg in SCRAPER_FALLBACKS:
+        try:
+            run_input = cfg["build_input"](username, max_tweets)
+            items = _run_apify_raw(client, cfg["name"], run_input)
+            if items:
+                return [i for i in items if isinstance(i, dict)]
+        except Exception:
+            continue
+    return []
 
 
 def _extract_interactions_from_tweet_items(
@@ -275,10 +340,16 @@ def fetch_network_data(
         _log("Fetching target following and followers...")
         following = fetch_following_apify(target, max_results=max_following)
         fetch_stats["total_fetch_calls"] += 1
-        followers = _fetch_followers_scraper(target, max_results=min(max_followers, MAX_FOLLOWERS_SAMPLE))
+        followers = (
+            _fetch_followers_apify(target, max_results=min(max_followers, MAX_FOLLOWERS_SAMPLE))
+            or _fetch_followers_scraper(target, max_results=min(max_followers, MAX_FOLLOWERS_SAMPLE))
+        )
         fetch_stats["total_fetch_calls"] += 1
         all_connections = list(dict.fromkeys(following + followers))
-        tweet_items = _fetch_tweet_items_scraper(target, max_tweets=max_interaction_tweets)
+        tweet_items = (
+            _fetch_tweet_items_apify(target, max_tweets=max_interaction_tweets)
+            or _fetch_tweet_items_scraper(target, max_tweets=max_interaction_tweets)
+        )
         fetch_stats["total_fetch_calls"] += 1
         interactions = _extract_interactions_from_tweet_items(target, tweet_items)
         inner_circle = _rank_connections(target, following, followers, interactions, inner_circle_size)
