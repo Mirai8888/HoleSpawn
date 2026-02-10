@@ -8,7 +8,6 @@ Without step 3 the graph is a useless star. Outputs NetworkData for analysis.
 
 import json
 import logging
-import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -16,15 +15,11 @@ from pathlib import Path
 from typing import Any
 
 from holespawn.ingest.apify_following import fetch_following_apify
-from holespawn.ingest.apify_twitter import (
-    APIFY_TWITTER_ACTOR,
-    SCRAPER_FALLBACKS,
-    _normalize_username,
-)
+from holespawn.ingest.apify_twitter import _normalize_username
+from holespawn.scraper import sync as scraper_sync
 
 logger = logging.getLogger(__name__)
 
-APIFY_FOLLOWERS_ACTOR_DEFAULT = "powerai/twitter-followers-scraper"
 MAX_FOLLOWERS_SAMPLE = 5000
 MAX_INTERACTION_TWEETS = 500
 CRAWL_DELAY_SEC = 1.5
@@ -40,7 +35,7 @@ class NetworkData:
     all_connections: list[str] = field(default_factory=list)
     interactions: list[dict] = field(default_factory=list)
     edges: list[dict] = field(default_factory=list)  # {source, target, weight, edge_types: list[str]}
-    fetch_stats: dict = field(default_factory=dict)  # nodes_attempted, nodes_succeeded, nodes_failed, total_apify_calls
+    fetch_stats: dict = field(default_factory=dict)  # nodes_attempted, nodes_succeeded, nodes_failed, total_fetch_calls
     # Legacy compat (derived)
     following: list[str] = field(default_factory=list)
     followers: list[str] = field(default_factory=list)
@@ -48,41 +43,16 @@ class NetworkData:
     raw_edges: list[tuple[str, str]] = field(default_factory=list)
 
 
-def _fetch_followers_apify(username: str, max_results: int = 2000) -> list[str]:
-    """Fetch followers list via Apify. Returns [] if no token or actor fails."""
-    token = os.getenv("APIFY_API_TOKEN") or os.getenv("APIFY_TOKEN")
-    if not token:
-        return []
+def _fetch_followers_scraper(username: str, max_results: int = 2000) -> list[str]:
+    """Fetch followers list via self-hosted scraper. Returns [] on failure."""
     username = _normalize_username(username)
     if not username:
         return []
     try:
-        from apify_client import ApifyClient
-    except ImportError:
-        return []
-    actor = os.getenv("APIFY_FOLLOWERS_ACTOR") or APIFY_FOLLOWERS_ACTOR_DEFAULT
-    try:
-        client = ApifyClient(token)
-        run_input = {"screenname": username, "maxResults": min(max_results, 5000)}
-        run = client.actor(actor).call(run_input=run_input)
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        return scraper_sync.fetch_followers(username, max_results=min(max_results, 5000))
     except Exception as e:
         logger.warning("Followers fetch failed for @%s: %s", username, e)
         return []
-    handles = []
-    for item in items:
-        if isinstance(item, dict):
-            h = (
-                item.get("screen_name")
-                or item.get("username")
-                or item.get("handle")
-                or item.get("screenName")
-            )
-            if h:
-                handles.append(str(h).strip().lstrip("@"))
-        elif isinstance(item, str):
-            handles.append(item.strip().lstrip("@"))
-    return handles[:max_results]
 
 
 def _extract_interactions_from_tweet_items(
@@ -103,7 +73,11 @@ def _extract_interactions_from_tweet_items(
             or item.get("tweet")
             or ""
         )
-        reply_to = item.get("in_reply_to_screen_name") or item.get("in_reply_to_screenname")
+        reply_to = (
+            item.get("in_reply_to_screen_name")
+            or item.get("in_reply_to_screenname")
+            or item.get("in_reply_to")
+        )
         if reply_to:
             u = str(reply_to).strip().lstrip("@").lower()
             if u and u != target_lower:
@@ -111,26 +85,30 @@ def _extract_interactions_from_tweet_items(
                 agg[u]["type_counts"]["reply"] += 1
                 if len(agg[u]["recent_texts"]) < 5:
                     agg[u]["recent_texts"].append((text or "")[:200])
-        rt_user = item.get("retweeted_status", {}) or item.get("retweetedStatus", {})
-        if isinstance(rt_user, dict):
-            ru = (
-                rt_user.get("user", {}).get("screen_name")
-                or rt_user.get("user", {}).get("username")
-                or rt_user.get("screenName")
-            )
-            if ru:
-                u = str(ru).strip().lstrip("@").lower()
-                if u != target_lower:
-                    agg[u]["username"] = u
-                    agg[u]["type_counts"]["rt"] += 1
-        quote_user = item.get("quoted_status", {}) or item.get("quotedStatus", {})
-        if isinstance(quote_user, dict):
-            qu = quote_user.get("user", {}).get("screen_name") or quote_user.get("user", {}).get("username")
-            if qu:
-                u = str(qu).strip().lstrip("@").lower()
-                if u != target_lower:
-                    agg[u]["username"] = u
-                    agg[u]["type_counts"]["quote"] += 1
+        ru = item.get("retweeted_status_screen_name")
+        if not ru:
+            rt_user = item.get("retweeted_status", {}) or item.get("retweetedStatus", {})
+            if isinstance(rt_user, dict):
+                ru = (
+                    rt_user.get("user", {}).get("screen_name")
+                    or rt_user.get("user", {}).get("username")
+                    or rt_user.get("screenName")
+                )
+        if ru:
+            u = str(ru).strip().lstrip("@").lower()
+            if u != target_lower:
+                agg[u]["username"] = u
+                agg[u]["type_counts"]["rt"] += 1
+        qu = item.get("quoted_user")
+        if not qu:
+            quote_user = item.get("quoted_status", {}) or item.get("quotedStatus", {})
+            if isinstance(quote_user, dict):
+                qu = quote_user.get("user", {}).get("screen_name") or quote_user.get("user", {}).get("username")
+        if qu:
+            u = str(qu).strip().lstrip("@").lower()
+            if u != target_lower:
+                agg[u]["username"] = u
+                agg[u]["type_counts"]["quote"] += 1
         entities = item.get("entities", {}) or item.get("user_mentions", [])
         mentions = entities.get("user_mentions", []) or entities.get("mentions", []) if isinstance(entities, dict) else (entities if isinstance(entities, list) else [])
         for m in mentions:
@@ -159,35 +137,17 @@ def _extract_interactions_from_tweet_items(
     return sorted(out, key=lambda x: -x["count"])
 
 
-def _fetch_tweet_items_apify(username: str, max_tweets: int = 500) -> list[dict[str, Any]]:
-    """Fetch raw tweet items for interaction parsing."""
-    token = os.getenv("APIFY_API_TOKEN") or os.getenv("APIFY_TOKEN")
-    if not token:
-        return []
+def _fetch_tweet_items_scraper(username: str, max_tweets: int = 500) -> list[dict[str, Any]]:
+    """Fetch raw tweet items for interaction parsing via self-hosted scraper."""
     username = _normalize_username(username)
     if not username:
         return []
     try:
-        from apify_client import ApifyClient
-    except ImportError:
-        return []
-    client = ApifyClient(token)
-    run_input = {"handles": [username], "maxTweets": max_tweets}
-    try:
-        run = client.actor(APIFY_TWITTER_ACTOR).call(run_input=run_input)
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        items = scraper_sync.fetch_tweets(username, max_tweets=max_tweets)
         return [i for i in items if isinstance(i, dict)]
-    except Exception:
-        pass
-    for cfg in SCRAPER_FALLBACKS:
-        try:
-            run_input = cfg["build_input"](username, max_tweets)
-            run = client.actor(cfg["name"]).call(run_input=run_input)
-            items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-            return [i for i in items if isinstance(i, dict)]
-        except Exception:
-            continue
-    return []
+    except Exception as e:
+        logger.warning("Tweet fetch failed for @%s: %s", username, e)
+        return []
 
 
 def _rank_connections(
@@ -267,9 +227,6 @@ def fetch_network_data(
     target = _normalize_username(target_username)
     if not target:
         return None
-    token = os.getenv("APIFY_API_TOKEN") or os.getenv("APIFY_TOKEN")
-    if not token:
-        return None
 
     def _log(msg: str, *args: Any) -> None:
         if callable(log_progress):
@@ -277,7 +234,7 @@ def fetch_network_data(
         else:
             logger.info(msg % args if args else msg)
     edges_by_pair: dict[tuple[str, str], dict[str, Any]] = {}
-    fetch_stats = {"nodes_attempted": 0, "nodes_succeeded": 0, "nodes_failed": 0, "total_apify_calls": 0}
+    fetch_stats = {"nodes_attempted": 0, "nodes_succeeded": 0, "nodes_failed": 0, "total_fetch_calls": 0}
     inner_circle: list[str] = []
     all_connections: list[str] = []
     interactions: list[dict] = []
@@ -317,12 +274,12 @@ def fetch_network_data(
         # Step 1: target's direct connections
         _log("Fetching target following and followers...")
         following = fetch_following_apify(target, max_results=max_following)
-        fetch_stats["total_apify_calls"] += 1
-        followers = _fetch_followers_apify(target, max_results=min(max_followers, MAX_FOLLOWERS_SAMPLE))
-        fetch_stats["total_apify_calls"] += 1
+        fetch_stats["total_fetch_calls"] += 1
+        followers = _fetch_followers_scraper(target, max_results=min(max_followers, MAX_FOLLOWERS_SAMPLE))
+        fetch_stats["total_fetch_calls"] += 1
         all_connections = list(dict.fromkeys(following + followers))
-        tweet_items = _fetch_tweet_items_apify(target, max_tweets=max_interaction_tweets)
-        fetch_stats["total_apify_calls"] += 1
+        tweet_items = _fetch_tweet_items_scraper(target, max_tweets=max_interaction_tweets)
+        fetch_stats["total_fetch_calls"] += 1
         interactions = _extract_interactions_from_tweet_items(target, tweet_items)
         inner_circle = _rank_connections(target, following, followers, interactions, inner_circle_size)
         mutuals = list(set(following) & set(followers))
@@ -352,7 +309,7 @@ def fetch_network_data(
         fetch_stats["nodes_attempted"] += 1
         time.sleep(crawl_delay_sec)
         node_following = _fetch_following_apify_quiet(node, max_results=800)
-        fetch_stats["total_apify_calls"] += 1
+        fetch_stats["total_fetch_calls"] += 1
         node_following_set = {_normalize_username(u) for u in node_following if u}
         if not node_following_set:
             fetch_stats["nodes_failed"] += 1

@@ -1,0 +1,14 @@
+# Copy to subjects.yaml and edit. Used by: python -m holespawn.record
+# Schedule with cron, e.g.: 0 14 * * * cd /path/to/HoleSpawn && python -m holespawn.record
+
+subjects:
+  - handle: "@target1"
+    source: twitter
+    interval: daily
+  - handle: "@target2"
+    source: twitter
+    interval: weekly
+  # Discord: not yet implemented
+  # - server: "server_name"
+  #   source: discord
+  #   interval: daily

@@ -1,4 +1,4 @@
-"""Ingest Twitter/X and Discord data: file, archive, or optional Apify (paid API)."""
+"""Ingest Twitter/X and Discord data: file, archive, or self-hosted scraper (Playwright)."""
 
 from .apify_following import fetch_following_apify
 from .apify_twitter import fetch_twitter_apify

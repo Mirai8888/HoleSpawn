@@ -108,7 +108,7 @@ def make_synthetic_network() -> NetworkData:
         all_connections=inner_circle,
         interactions=[],
         edges=edges,
-        fetch_stats={"nodes_attempted": 15, "nodes_succeeded": 15, "nodes_failed": 0, "total_apify_calls": 17},
+        fetch_stats={"nodes_attempted": 15, "nodes_succeeded": 15, "nodes_failed": 0, "total_fetch_calls": 17},
         following=[],
         followers=[],
         mutuals=[],
@@ -135,7 +135,7 @@ def test_validate_star_graph():
             {"source": "target", "target": n, "weight": 1, "edge_types": ["follow"]}
             for n in ["a", "b", "c", "d", "e"]
         ],
-        fetch_stats={"nodes_attempted": 5, "nodes_succeeded": 5, "nodes_failed": 0, "total_apify_calls": 7},
+        fetch_stats={"nodes_attempted": 5, "nodes_succeeded": 5, "nodes_failed": 0, "total_fetch_calls": 7},
         following=[],
         followers=[],
         mutuals=[],

@@ -8,6 +8,9 @@ env/
 .env.local
 *.pem
 
+# Scraper session and cache (do not commit)
+data/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -23,12 +26,15 @@ build/
 output/
 outputs/
 out/
+recordings/
+recordings.db
 .cache/
 logs/
 .pytest_cache/
 
 # Rust / Cargo
 target/
+Cargo.lock
 
 # Make (do not commit)
 Makefile

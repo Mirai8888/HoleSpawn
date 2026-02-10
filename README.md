@@ -52,6 +52,19 @@ pip install -r requirements.txt
 echo "ANTHROPIC_API_KEY=your_credential" > .env
 ```
 
+**5. (Optional) X/Twitter live data — self-hosted scraper**
+
+For `--twitter-username`, network live fetch, and recording you need a logged-in X session (no Apify token):
+
+```bash
+pip install playwright
+playwright install chromium
+python -m holespawn.scraper login    # opens browser; log in to X, then press Enter
+python -m holespawn.scraper status   # verify session
+```
+
+Cookies are stored in `data/x_cookies.json` (gitignored). Session expires periodically; re-run `login` when needed.
+
 ### Cost Control Configuration
 
 System implements dual-threshold cost management:
@@ -69,7 +82,7 @@ Cost breakdown logged to `cost_breakdown.json` adjacent to output.
 
 System surfaces errors with clear classification:
 
-- Apify errors: `ApifyError` class
+- Scraper/session errors: `ScraperError` (e.g. no X cookies; run `python -m holespawn.scraper login`)
 - LLM errors: `LLM call failed (provider=... model=...): ...`
 - CLI errors: `[holespawn]` prefix on stderr
 
@@ -165,11 +178,12 @@ python -m holespawn.network path/to/profiles_dir/ --edges edges.csv -o network_r
 ```
 Edge file format: CSV with `source,target` columns
 
-**Option 3: Live Data Acquisition (Apify)**
+**Option 3: Live Data Acquisition (self-hosted scraper)**
 ```bash
+python -m holespawn.scraper login   # one-time: log in to X in browser, save cookies
 python -m holespawn.network --apify @username --max-following 50 -o network_report.json
 ```
-Requires: `APIFY_API_TOKEN` environment variable
+Requires: X session cookies (`python -m holespawn.scraper login`). No Apify token.
 
 ### Output Specification
 
@@ -453,6 +467,91 @@ All engagement logged. All deployment recorded. All metrics quantified.
 Operation proceeds deterministically within stochastic constraints.
 
 Complete technical specification: [docs/AUTONOMOUS_OPERATIONS.md](docs/AUTONOMOUS_OPERATIONS.md)
+
+---
+
+## PLATFORM ROADMAP
+
+HoleSpawn is the **cognitive substrate analysis layer** in a larger ecosystem. It models how influence works by building the tools that do it. Ethics boundary: demonstrate mechanism to enable defense. Offensive capability for defensive understanding.
+
+**Ecosystem positioning:**
+- **HoleSpawn:** Profiles individual and network-level cognitive vulnerabilities. Evolution from snapshot to surveillance — from camera to feed.
+- **ThreatMouth** (separate repo): Monitors technical threat surface.
+- **ThreadMap** (separate repo, pre-development): Models hybrid technical–cognitive operation chains.
+
+**Phase 1 — Documentation.** README is the documentation. Current-state architecture captured in ASCII below.
+
+**Phase 2 — Active recording.** Recorder daemon writes time-stamped raw ingest to `recordings/{twitter|discord}/{subject_id}/YYYYMMDD_HHMMSS.json`. SQLite index (`recordings.db`) for query by subject, timestamp, source. Config: `subjects.yaml` (handle/server, source, interval). Scheduler: cron or simple daemon running `python -m holespawn.record`. No APScheduler. Fetch uses self-hosted scraper (X session required: `python -m holespawn.scraper login`). Run: `python -m holespawn.record` (optional: `--config subjects.yaml`, `--recordings-dir recordings`). Copy `subjects.yaml.example` to `subjects.yaml` and add Twitter handles.
+
+**Phase 3 — Temporal NLP.** No LLM. VADER + theme extraction per time window. Output: time series for TUI sparklines (sentiment, topic drift). Sentiment shift + topic drift + vocabulary change = influence signature. Run: `python -m holespawn.temporal --subject @handle` (optional: `--recordings-dir recordings`, `--limit 30`, `--output trends.json`). Reads `recordings/` and `recordings.db` from Phase 2.
+
+**Phase 4 — Cohort.** Inner circle from network analysis is the cohort. Temporal NLP across inner circle → community-level sentiment trends. One LLM call to synthesize.
+
+**Phase 5 — TUI.** Add Recording tab (what is watched, last/next fetch, health) and Trends tab (per-subject sparklines, topic drift, anomaly flags) to existing HoleSpawn TUI. Profile and Network tabs unchanged.
+
+**Phase 6 — Alerting.** Discord webhook to `#cognitive-alerts` for events such as sentiment drop in cohort or new bridge node. Reuse ThreatMouth delivery pattern. Voice/synthesis deferred.
+
+---
+
+## CURRENT-STATE ARCHITECTURE
+
+```
+                    INPUTS
+                       │
+    ┌──────────────────┼──────────────────┐
+    │                  │                  │
+    ▼                  ▼                  ▼
+┌─────────┐    ┌─────────────┐    ┌─────────────┐
+│ Twitter │    │   Discord   │    │   File /     │
+│ Archive │    │   Export    │    │   Scraper    │
+│  (ZIP)  │    │   (JSON)    │    │   (live X)   │
+└────┬────┘    └──────┬──────┘    └──────┬──────┘
+     │                │                  │
+     └────────────────┼──────────────────┘
+                      ▼
+              ┌───────────────┐
+              │    INGEST     │
+              │ loader,       │
+              │ scraper       │
+              └───────┬───────┘
+                      │
+         ┌────────────┼────────────┐
+         ▼            ▼            ▼
+   ┌──────────┐ ┌──────────┐ ┌──────────┐
+   │  PROFILE │ │   NLP    │ │  NETWORK │
+   │ analyzer │ │ Discord  │ │ pipeline │
+   │ build_   │ │ analyzer │ │ graph,   │
+   │ profile  │ │ (VADER,  │ │ node     │
+   │          │ │  themes) │ │ profiler │
+   └────┬─────┘ └────┬─────┘ └────┬─────┘
+        │            │            │
+        └────────────┼────────────┘
+                     ▼
+              ┌───────────────┐
+              │     LLM       │
+              │ synthesis,    │
+              │ brief,        │
+              │ vulnerability │
+              └───────┬───────┘
+                      │
+         ┌────────────┼────────────┐
+         ▼            ▼            ▼
+   ┌──────────┐ ┌──────────┐ ┌──────────┐
+   │behavioral│ │ binding  │ │ network  │
+   │ matrix   │ │ protocol │ │ report   │
+   │ trap_    │ │          │ │ graph    │
+   │ arch     │ │          │ │          │
+   └──────────┘ └──────────┘ └──────────┘
+                      │
+                      ▼
+              ┌───────────────┐
+              │  TUI / C2     │
+              │  Dashboard    │
+              └───────────────┘
+
+   (Phase 2 adds: RECORD → recordings/ + index
+    Phase 3–4 add: temporal NLP → trends)
+```
 
 ---
 

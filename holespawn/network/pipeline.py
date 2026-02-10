@@ -130,7 +130,7 @@ def run_network_graph_pipeline(
         apify_est = 2 + inner_circle_size
         llm_est = (0 if communities_only else top_nodes) + 1
         _log(
-            "Network analysis for @%s: inner circle %d → ~%d Apify calls, %d LLM calls. Proceed? [y/N] ",
+            "Network analysis for @%s: inner circle %d → ~%d scraper calls, %d LLM calls. Proceed? [y/N] ",
             target_username.lstrip("@"),
             inner_circle_size,
             apify_est,
@@ -152,7 +152,7 @@ def run_network_graph_pipeline(
         log_progress=_log,
     )
     if network_data is None:
-        raise ValueError("Failed to fetch network data (check APIFY_API_TOKEN and username)")
+        raise ValueError("Failed to fetch network data (check X session and username)")
     checks = validate_network_data(network_data)
     if not checks.get("has_real_graph"):
         raise ValueError(

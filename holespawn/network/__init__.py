@@ -1,7 +1,7 @@
 """
-Network analysis from file-based data or paid APIs (Apify).
+Network analysis from file-based data or live-scraped Twitter profiles.
 - Graph profiling: fetch social graph -> Louvain communities -> profile key nodes -> vulnerability report + D3 viz.
-- Profile-based: load behavioral_matrix.json (or --apify) -> community detection -> engagement brief.
+- Profile-based: load behavioral_matrix.json (or --apify for live scrape) -> community detection -> engagement brief.
 """
 
 from .analyzer import NetworkAnalyzer, load_edges_file, load_profiles_from_dir

@@ -1,7 +1,7 @@
 """
-Optional: build network profiles via paid APIs (Apify).
+Optional: build network profiles via paid APIs / live scraping.
 Fetch a target user's following list, then fetch tweets and profile each account.
-Use only with API access you are authorized to use.
+Uses the same Twitter scraper as main ingest (self-hosted Playwright).
 """
 
 from dataclasses import asdict
@@ -26,8 +26,8 @@ def fetch_profiles_via_apify(
     include_target: bool = True,
 ) -> dict[str, dict[str, Any]]:
     """
-    Fetch target's following list via Apify, then for each user fetch tweets and build profile.
-    Requires APIFY_API_TOKEN. Returns dict: username -> profile dict (same shape as load_profiles_from_dir).
+    Fetch target's following list via Twitter scraper, then for each user fetch tweets and build profile.
+    Returns dict: username -> profile dict (same shape as load_profiles_from_dir).
     Capped by max_following to control cost and rate.
     """
     target_username = (target_username or "").strip().lstrip("@")

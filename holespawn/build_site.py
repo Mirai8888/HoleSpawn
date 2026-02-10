@@ -1,6 +1,6 @@
 """
 Build a full personalized website from Twitter/X data.
-Twitter-only: --twitter-archive (recommended) or --twitter-username (Apify) or file.
+Twitter-only: --twitter-archive (recommended) or --twitter-username (self-hosted scraper) or file.
 Pipeline: ingest -> profile -> AI spec -> site -> optional deploy.
 """
 
@@ -40,7 +40,7 @@ except ImportError:
 from holespawn.cache import ProfileCache
 from holespawn.config import load_config
 from holespawn.cost_tracker import CostTracker
-from holespawn.errors import ApifyError
+from holespawn.errors import ScraperError
 from holespawn.experience import get_experience_spec
 from holespawn.ingest import (
     SocialContent,
@@ -196,7 +196,7 @@ Examples:
   # Twitter archive (recommended)
   python -m holespawn.build_site --twitter-archive path/to/twitter-archive.zip
 
-  # Apify (requires APIFY_API_TOKEN)
+    # Scraper (requires X session: python -m holespawn.scraper login)
   python -m holespawn.build_site --twitter-username @username
 
   # Text file
@@ -228,7 +228,7 @@ Examples:
         "--twitter-username",
         metavar="USERNAME",
         default=None,
-        help="Twitter/X username (e.g. @user). Uses Apify; requires APIFY_API_TOKEN.",
+        help="Twitter/X username (e.g. @user). Uses self-hosted scraper; requires X session (python -m holespawn.scraper login).",
     )
     parser.add_argument(
         "-o",
@@ -316,7 +316,7 @@ Examples:
     parser.add_argument(
         "--network",
         action="store_true",
-        help="Run network graph profiling (fetch graph + inter-connection crawl, profile key nodes, write network_raw_data.json, network_analysis.json, network_report.md, network_graph.html). Requires --twitter-username and APIFY_API_TOKEN.",
+        help="Run network graph profiling (fetch graph + inter-connection crawl, profile key nodes, write network_raw_data.json, network_analysis.json, network_report.md, network_graph.html). Requires --twitter-username and an X session (python -m holespawn.scraper login).",
     )
     parser.add_argument(
         "--inner-circle-size",
@@ -417,22 +417,22 @@ def main() -> None:
         _log(f"Loaded {len(posts_list)} tweets from archive.")
         username = Path(args.twitter_archive).stem.replace(" ", "_")[:50]
     elif args.twitter_username:
-        _log("Fetching tweets via Apify...")
+        _log("Fetching tweets via self-hosted scraper...")
         try:
             content = fetch_twitter_apify(args.twitter_username)
-        except ApifyError as e:
-            _log(f"Apify failed: {e}")
+        except ScraperError as e:
+            _log(str(e))
+            _log("Run: python -m holespawn.scraper login")
             sys.exit(1)
         if content is None:
-            if not os.getenv("APIFY_API_TOKEN") and not os.getenv("APIFY_TOKEN"):
-                _log("Apify requires APIFY_API_TOKEN. Set it in .env or use --twitter-archive.")
-            else:
-                _log(
-                    "No tweets returned for this username. The account may be private, have no public tweets, or Twitter may be blocking timeline scraping."
-                )
-                _log(
-                    "Try: --twitter-archive with a ZIP from Twitter (Settings -> Download your data), or use a different (public) username."
-                )
+            _log(
+                "No tweets returned for this username. The account may be private, have no public tweets, "
+                "or X may be blocking timeline scraping."
+            )
+            _log(
+                "Try: --twitter-archive with a ZIP from X (Settings -> Download your data), "
+                "or use a different (public) username."
+            )
             sys.exit(1)
         posts_list = list(content.iter_posts())
         _log(f"Fetched {len(posts_list)} tweets.")

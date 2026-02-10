@@ -1,7 +1,7 @@
 """
 CLI for network analysis. Two modes:
   1) Graph profiling: python -m holespawn.network @username -o output_dir  (fetch graph, profile key nodes, report + viz)
-  2) File-based / Apify profiles: python -m holespawn.network profiles_dir/ -o report.json  or  --apify @user -o report.json
+  2) File-based / live-scraped profiles: python -m holespawn.network profiles_dir/ -o report.json  or  --apify @user -o report.json
 """
 
 import argparse
@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-# Load .env so APIFY_API_TOKEN and LLM keys are available (same as build_site)
+# Load .env so LLM keys are available (same as build_site)
 ROOT = Path(__file__).resolve().parent.parent.parent
 try:
     from dotenv import load_dotenv
@@ -44,7 +44,7 @@ def _looks_like_username(s: str) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Network analysis: graph profiling (@username) or file-based profiles (dir / --apify)."
+        description="Network analysis: graph profiling (@username) or file-based / live-scraped profiles (dir / --apify)."
     )
     parser.add_argument(
         "positional",
@@ -57,7 +57,10 @@ def main() -> None:
         type=str,
         default=None,
         metavar="USERNAME",
-        help="Fetch network via Apify: target username (e.g. @user). Uses APIFY_API_TOKEN.",
+        help=(
+            "Fetch network via self-hosted scraper (legacy flag name): target username (e.g. @user). "
+            "Requires X session (python -m holespawn.scraper login)."
+        ),
     )
     parser.add_argument(
         "--max-following",
@@ -185,7 +188,7 @@ def main() -> None:
         n = args.max_following
         if n > 20 and not args.yes:
             sys.stderr.write(
-                f"[holespawn] Large Apify run: --max-following={n}. Apify will run ~{n} tweet scrapes + 1 following list (billed separately). "
+                f"[holespawn] Large scraper run: --max-following={n}. Scraper will run ~{n} tweet scrapes + 1 following list. "
                 "LLM cost for network brief only is typically $0.01–0.10. Continue? [y/N] "
             )
             try:
@@ -203,11 +206,11 @@ def main() -> None:
                 max_tweets_per_user=300,
             )
         except Exception as e:
-            sys.stderr.write(f"[holespawn] error: Apify failed: {e}\n")
+            sys.stderr.write(f"[holespawn] error: scraper fetch failed: {e}\n")
             sys.exit(1)
         if not profiles:
             sys.stderr.write(
-                "[holespawn] error: no profiles from Apify (check APIFY_API_TOKEN and --apify username)\n"
+                "[holespawn] error: no profiles from scraper (check X session and --apify username)\n"
             )
             sys.exit(1)
     elif args.positional and Path(args.positional).is_dir():

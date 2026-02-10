@@ -16,8 +16,8 @@ anthropic>=0.39.0
 openai>=1.0.0
 google-genai>=0.5.0
 
-# Optional: Apify Twitter scraper (--twitter-username); requires APIFY_API_TOKEN
-apify-client>=1.6.0
+# Self-hosted X/Twitter scraper (Playwright). Run: playwright install chromium
+playwright>=1.40
 
 # Optional: Agent social engagement (Discord DMs, Twitter DMs/replies)
 discord.py>=2.0.0
