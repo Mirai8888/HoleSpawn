@@ -162,6 +162,51 @@ STOP = {
     "get",
     "got",
     "im",
+    # Contractions and informal
+    "it's", "i'm", "don't", "can't", "won't", "didn't", "doesn't", "isn't",
+    "aren't", "wasn't", "weren't", "haven't", "hasn't", "hadn't", "wouldn't",
+    "shouldn't", "couldn't", "i've", "you've", "we've", "they've", "i'll",
+    "you'll", "we'll", "they'll", "i'd", "you'd", "we'd", "they'd", "that's",
+    "there's", "here's", "what's", "who's", "let's", "it'll", "he's", "she's",
+    "ive", "youve", "weve", "theyve", "ill", "youll", "well", "theyll",
+    "id", "youd", "wed", "theyd", "thats", "theres", "heres", "whats",
+    # Common short words that aren't meaningful themes
+    "one", "two", "three", "new", "old", "even", "also", "still", "much",
+    "many", "way", "thing", "things", "something", "anything", "everything",
+    "nothing", "someone", "anyone", "everyone", "really", "actually", "basically",
+    "literally", "maybe", "probably", "definitely", "absolutely", "pretty",
+    "quite", "rather", "always", "never", "often", "sometimes", "already",
+    "yet", "ever", "since", "today", "tomorrow", "yesterday", "tonight",
+    "back", "going", "come", "came", "goes", "went", "take", "took",
+    "make", "made", "making", "say", "said", "says", "saying",
+    "think", "thought", "know", "knew", "see", "saw", "look", "looking",
+    "want", "need", "use", "used", "using", "try", "tried",
+    "give", "gave", "put", "keep", "kept", "let", "seem", "seemed",
+    "tell", "told", "find", "found", "call", "called", "ask", "asked",
+    "work", "feel", "felt", "leave", "left", "long", "right", "big",
+    "good", "bad", "great", "little", "lot", "lots", "bit", "kind",
+    "part", "point", "place", "time", "times", "year", "years", "day", "days",
+    "week", "weeks", "month", "months", "world", "life", "people", "person",
+    "man", "woman", "guy", "first", "last", "next", "end", "start",
+    "different", "every", "another", "whole", "real", "sure", "full",
+    "later", "earlier", "ago", "away", "around", "else", "though",
+    "enough", "almost", "getting", "better", "best", "worst", "hard",
+    "easy", "far", "close", "high", "low", "small", "large",
+    # URL fragments and social media noise
+    "com", "www", "https", "http", "org", "net", "io", "co",
+    "pic", "twitter", "status", "utm", "ref", "source", "amp",
+    "lol", "lmao", "omg", "tbh", "imo", "imho", "smh", "ngl",
+    # Additional common non-meaningful words
+    "yes", "no", "per", "would", "could", "might", "may", "must",
+    "shall", "will", "won", "re", "ve", "ll", "isn", "aren", "wasn",
+    "weren", "haven", "hasn", "hadn", "wouldn", "shouldn", "couldn",
+    "doesn", "didn", "won", "super", "totally", "finally", "especially",
+    "please", "thanks", "thank", "sorry", "okay", "ok", "oh", "well",
+    "hey", "hi", "hello", "yeah", "yep", "nope", "nah", "hmm",
+    "watching", "version", "final", "happen", "happened", "happening",
+    "goes", "mean", "means", "set", "run", "running", "read", "reading",
+    "writes", "write", "writing", "saw", "seen", "hear", "heard",
+    "believe", "guess", "hope", "wish", "wonder",
 }
 
 
@@ -225,7 +270,8 @@ def _extract_themes(posts: list[str], top_n: int = 25) -> list[tuple[str, float]
     counter: Counter[str] = Counter()
     for post in posts:
         for w in _tokenize(post):
-            if w not in STOP and len(w) > 1:
+            # Skip stopwords, single chars, pure numbers, and very short tokens
+            if w not in STOP and len(w) > 2 and not w.isdigit() and not w.replace(".", "").isdigit():
                 counter[w] += 1
     total = sum(counter.values())
     if total == 0:
@@ -298,29 +344,69 @@ def _analyze_communication_style(posts: list[str]) -> str:
     if not posts:
         return "conversational/rambling"
     combined = " ".join(posts).lower()
-    irony_markers = ["lmao", "lol", "fr fr", "no cap", "unironically", "ngl", "tbh"]
-    has_irony = sum(1 for m in irony_markers if m in combined) >= 2
-    academic_markers = ["however", "moreover", "thus", "therefore", "specifically", "furthermore"]
-    is_academic = sum(1 for m in academic_markers if m in combined) > 2
-    cryptic_markers = [
-        "...",
-        "they dont want you to know",
-        "wake up",
-        "the truth",
-        "they don't want",
-    ]
-    is_cryptic = any(m in combined for m in cryptic_markers)
-    avg_length = sum(len(p.split()) for p in posts) / len(posts) if posts else 0
+    n = len(posts)
+
+    # Score multiple style dimensions
+    irony_markers = ["lmao", "lol", "fr fr", "no cap", "unironically", "ngl", "tbh", "bruh"]
+    irony_score = sum(1 for m in irony_markers if m in combined)
+
+    academic_markers = ["however", "moreover", "thus", "therefore", "specifically",
+                        "furthermore", "consequently", "methodology", "hypothesis",
+                        "peer-reviewed", "empirically", "systematically"]
+    academic_score = sum(1 for m in academic_markers if m in combined)
+
+    # Conspiratorial requires STRONG signals, not just "..."
+    conspiracy_markers = ["they dont want you to know", "they don't want you to know",
+                          "wake up sheeple", "open your eyes", "deep state",
+                          "the elites", "cover-up", "coverup", "psyop"]
+    conspiracy_score = sum(1 for m in conspiracy_markers if m in combined)
+
+    # Technical/insider voice — domain expertise + insider framing
+    technical_markers = ["implementation", "architecture", "protocol", "infrastructure",
+                         "specification", "configuration", "vulnerability", "exploit",
+                         "firmware", "compiler", "kernel", "api", "endpoint",
+                         "latency", "throughput", "stack", "pipeline", "deployment"]
+    technical_score = sum(1 for m in technical_markers if m in combined)
+
+    # Observational/analytical — pattern recognition language
+    analytical_markers = ["interesting", "notable", "pattern", "trend", "correlation",
+                          "implication", "context", "nuance", "counterpoint",
+                          "observation", "in other words", "which means"]
+    analytical_score = sum(1 for m in analytical_markers if m in combined)
+
+    # Passionate/advocacy — cause-driven language
+    advocacy_markers = ["must", "should", "need to", "important", "critical",
+                        "unacceptable", "demand", "fight", "protect", "defend",
+                        "stand up", "speak out", "justice", "rights"]
+    advocacy_score = sum(1 for m in advocacy_markers if m in combined)
+
+    avg_length = sum(len(p.split()) for p in posts) / n
     is_punchy = avg_length < 15
-    if is_cryptic:
-        return "cryptic/conspiratorial"
-    if is_academic:
-        return "academic/formal"
-    if has_irony and is_punchy:
-        return "casual/memey"
+    is_verbose = avg_length > 30
+
+    # Classify by highest signal
+    scores = {
+        "technical/insider": technical_score * 1.5,
+        "academic/formal": academic_score * 2.0,
+        "analytical/observational": analytical_score * 1.5,
+        "casual/memey": irony_score * 2.0,
+        "passionate/advocacy": advocacy_score * 1.0,
+        "cryptic/conspiratorial": conspiracy_score * 3.0,
+    }
+
+    best_style = max(scores, key=scores.get)
+    best_score = scores[best_style]
+
+    # Require minimum signal strength
+    if best_score >= 3:
+        return best_style
+
+    # Fall back to structural analysis
     if is_punchy:
         return "direct/concise"
-    return "conversational/rambling"
+    if is_verbose:
+        return "conversational/rambling"
+    return "conversational/mixed"
 
 
 def _extract_unique_vocabulary(
@@ -484,6 +570,22 @@ def _infer_aesthetic_from_style(communication_style: str) -> tuple[str, str, str
             "modern sans, large clear type",
         ),
         "conversational/rambling": ("warm, neutral", "balanced", "readable sans"),
+        "conversational/mixed": ("warm, neutral", "balanced", "readable sans"),
+        "technical/insider": (
+            "dark, terminal-like",
+            "structured, code-inspired",
+            "monospace, technical",
+        ),
+        "analytical/observational": (
+            "cool, muted blues",
+            "structured, hierarchical",
+            "clean serif, data-focused",
+        ),
+        "passionate/advocacy": (
+            "bold, warm contrast",
+            "dynamic, action-oriented",
+            "strong sans-serif, impactful",
+        ),
     }
     return aesthetics.get(communication_style, ("neutral", "balanced", "clean sans"))
 
