@@ -16,7 +16,9 @@ Cognitive substrate analysis: profiles individuals' psychological vulnerabilitie
 - Output cleanup: scripts/clean_outputs.py enforces binding_protocol.md, dedupes by username, removes temp profiles dir and repo-wide temp files.
 
 ### Active Work
-- SCT integration complete (2026-02-11). Next: delivery channel integration, CLI --sct flag.
+- Network analysis of @gOPwbi7qqtWeD9o (Mirai Junsei) in progress with visualization.
+- Scraper integration — convenience function for ad-hoc Twitter profiling.
+- Delivery channel integration, CLI --sct flag.
 
 ### Queued
 1. HoleSpawn scraper — replace Apify with self-hosted Playwright scraper (spec: holespawn_scraper_spec.md); currently not working, do not block on it.
@@ -28,6 +30,8 @@ Cognitive substrate analysis: profiles individuals' psychological vulnerabilitie
 7. Rust TUI refinements per holespawn_tui_spec.md.
 
 ### Completed
+- **NLP Pipeline Overhaul** (2026-02-11): Expanded stopword set (200+ entries), numeric token filtering, 7 communication style categories (technical/insider, analytical/observational, passionate/advocacy, etc.), better theme extraction. Fixed false "cryptic/conspiratorial" classification. Interest extraction threshold lowered to 0.01 with fallback.
+- **Field Tests FT-001 + FT-002** (2026-02-11): Full pipeline tested against @schneierblog and @SwiftOnSecurity. Both correctly scored 0.05 overall susceptibility. 4 bugs found and fixed: interest threshold, delivery type error, stopword leakage, style misclassification.
 - **SCT Integration** (2026-02-11): `holespawn.sct` module — algorithmic SCT-001 through SCT-012 vulnerability mapping from behavioral matrices (no LLM), LLM-enhanced engagement optimization, standalone vulnerability report generator with heatmap. Integrated into engagement.py via `sct_enhance=True`. Tests: `tests/test_sct.py`.
 - **Delivery system v1** (2026-02-10): `holespawn.delivery` — generate one tailored message from existing run (behavioral_matrix + binding_protocol) via LLM; deliver to `file` or `stdout`. CLI: `python -m holespawn.delivery --output-dir outputs/... --channel file --out delivery_out`. Design: `docs/DELIVERY_DESIGN.md`. Live send (Twitter/Discord/email) not implemented; channel stubs return text only.
 - **Phase 5: Recording tab** (2026-02-10): TUI tab [5] Recording shows subjects from recordings.db (subject_id, last_timestamp, snapshot_count, record_count). Data from `python -m holespawn.temporal --list-subjects`; refreshed when entering tab. Python CLI extended with `--list-subjects` (JSON to stdout). Rust: `View::Recording`, `data/recordings.rs` (fetch_recordings_summary), `ui/recording.rs`.

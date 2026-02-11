@@ -604,6 +604,31 @@ Methodology: Binding and shaping of informational threads.
 
 Contact: [seithar.com](https://seithar.com)
 
+## SCT INTEGRATION (NEW)
+
+HoleSpawn now integrates the Seithar Cognitive Defense Taxonomy for vulnerability surface mapping.
+
+**Module:** `holespawn.sct`
+
+| Component | Function |
+|-----------|----------|
+| `sct.mapper` | Algorithmic SCT-001 through SCT-012 vulnerability scoring — no LLM required |
+| `sct.enhancer` | LLM-enhanced engagement strategy optimization using SCT vulnerability data |
+| `sct.report` | Standalone vulnerability reports with ASCII heatmap visualization |
+
+**Pipeline:** Ingest → Profile → SCT Map → Engagement Brief → SCT Enhancement → Delivery Message
+
+```python
+from holespawn.sct.mapper import SCTMapper
+from holespawn.sct.report import generate_sct_report
+
+mapper = SCTMapper()
+vuln_map = mapper.map(behavioral_matrix)
+report = generate_sct_report(behavioral_matrix, "@target")
+```
+
+**Field-tested** against real targets. Correctly differentiates high-resistance analytical profiles (0.05 susceptibility) from emotionally reactive profiles (0.69+ on SCT-001).
+
 ## CONNECT
 
 | Channel | Link |
