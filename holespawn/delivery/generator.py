@@ -35,7 +35,7 @@ def _load_profile_summary(output_dir: Path) -> dict[str, Any]:
     except (json.JSONDecodeError, OSError):
         return {}
     themes = data.get("themes", [])[:10]
-    theme_str = ", ".join(t[0] for t in themes if isinstance(t, (list, tuple)) and len(t) >= 1)
+    theme_str = ", ".join(str(t[0]) for t in themes if isinstance(t, (list, tuple)) and len(t) >= 1)
     return {
         "communication_style": data.get("communication_style", ""),
         "sample_phrases": data.get("sample_phrases", [])[:5],

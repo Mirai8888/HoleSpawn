@@ -397,7 +397,12 @@ def _extract_obsessions(posts: list[str], themes: list[tuple[str, float]]) -> li
 
 def _extract_specific_interests(posts: list[str], themes: list[tuple[str, float]]) -> list[str]:
     """Concrete narrow interests from themes and phrases."""
-    interests = [t[0] for t in themes[:15] if t[0] and len(t[0]) > 2 and t[1] > 0.05]
+    # Use top themes regardless of frequency — the ranking itself signals interest
+    # Original 0.05 threshold was too aggressive for diverse profiles
+    interests = [t[0] for t in themes[:20] if t[0] and len(t[0]) > 2 and t[1] > 0.01]
+    if len(interests) < 5:
+        # Fall back to raw top themes if threshold filters too aggressively
+        interests = [t[0] for t in themes[:12] if t[0] and len(t[0]) > 2]
     return interests[:12]
 
 
