@@ -9,6 +9,8 @@ from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
 from holespawn.llm import call_llm
 from holespawn.profile import PsychologicalProfile
+from holespawn.sct.mapper import SCTMapper
+from holespawn.sct.enhancer import enhance_engagement
 
 ENGAGEMENT_SYSTEM = """You are an analyst producing a **narrative engineering** brief. The goal is to profile one person so they can be shaped or steered through narrative — i.e. what stories, information flows, and social dynamics will move them toward desired beliefs, actions, or roles.
 
@@ -56,6 +58,7 @@ def get_engagement_brief(
     model: str | None = None,
     tracker: CostTracker | None = None,
     calls_per_minute: int = 20,
+    sct_enhance: bool = False,
 ) -> str:
     """
     Generate an engagement brief: vulnerability map, DM ideas, orchestration plan.
@@ -66,7 +69,7 @@ def get_engagement_brief(
         "Based on this profile and narrative, output the engagement brief (markdown only, no preamble).\n\n"
         + context
     )
-    return call_llm(
+    brief = call_llm(
         ENGAGEMENT_SYSTEM,
         user_content,
         provider_override=provider,
@@ -76,6 +79,34 @@ def get_engagement_brief(
         tracker=tracker,
         calls_per_minute=calls_per_minute,
     )
+
+    if sct_enhance:
+        try:
+            matrix = {
+                "themes": [(t, 1) for t in (profile.themes or [])],
+                "sentiment": {
+                    "compound": getattr(profile, "sentiment_compound", 0),
+                    "pos": getattr(profile, "sentiment_positive", 0),
+                    "neg": getattr(profile, "sentiment_negative", 0),
+                    "neu": getattr(profile, "sentiment_neutral", 0),
+                },
+                "communication_style": getattr(profile, "communication_style", ""),
+                "sample_phrases": getattr(profile, "sample_phrases", []),
+                "specific_interests": getattr(profile, "specific_interests", []),
+            }
+            mapper = SCTMapper()
+            vuln_map = mapper.map(matrix)
+            addendum = enhance_engagement(
+                brief, vuln_map,
+                provider=provider, model=model,
+                tracker=tracker, calls_per_minute=calls_per_minute,
+            )
+            brief += addendum
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("SCT enhancement failed: %s", e)
+
+    return brief
 
 
 def _profile_dict_to_context(profile: dict) -> str:
