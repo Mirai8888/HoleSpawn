@@ -16,7 +16,7 @@ Cognitive substrate analysis: profiles individuals' psychological vulnerabilitie
 - Output cleanup: scripts/clean_outputs.py enforces binding_protocol.md, dedupes by username, removes temp profiles dir and repo-wide temp files.
 
 ### Active Work
-- None.
+- SCT integration complete (2026-02-11). Next: delivery channel integration, CLI --sct flag.
 
 ### Queued
 1. HoleSpawn scraper — replace Apify with self-hosted Playwright scraper (spec: holespawn_scraper_spec.md); currently not working, do not block on it.
@@ -28,6 +28,7 @@ Cognitive substrate analysis: profiles individuals' psychological vulnerabilitie
 7. Rust TUI refinements per holespawn_tui_spec.md.
 
 ### Completed
+- **SCT Integration** (2026-02-11): `holespawn.sct` module — algorithmic SCT-001 through SCT-012 vulnerability mapping from behavioral matrices (no LLM), LLM-enhanced engagement optimization, standalone vulnerability report generator with heatmap. Integrated into engagement.py via `sct_enhance=True`. Tests: `tests/test_sct.py`.
 - **Delivery system v1** (2026-02-10): `holespawn.delivery` — generate one tailored message from existing run (behavioral_matrix + binding_protocol) via LLM; deliver to `file` or `stdout`. CLI: `python -m holespawn.delivery --output-dir outputs/... --channel file --out delivery_out`. Design: `docs/DELIVERY_DESIGN.md`. Live send (Twitter/Discord/email) not implemented; channel stubs return text only.
 - **Phase 5: Recording tab** (2026-02-10): TUI tab [5] Recording shows subjects from recordings.db (subject_id, last_timestamp, snapshot_count, record_count). Data from `python -m holespawn.temporal --list-subjects`; refreshed when entering tab. Python CLI extended with `--list-subjects` (JSON to stdout). Rust: `View::Recording`, `data/recordings.rs` (fetch_recordings_summary), `ui/recording.rs`.
 - **Phase 4: Cohort analysis plumbing** (2026-02-10): `holespawn.temporal.cohort` — `build_cohort_results(recordings_dir, subject_ids, ...)` (per-subject series + signatures) and `aggregate_cohort(cohort_results)` (cohort-level time series + drift signature). No LLM; ready for inner-circle wiring from network analysis and later Claude summarization. Tests: `tests/test_temporal_cohort.py`.
