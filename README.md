@@ -168,17 +168,6 @@ Detailed specifications in `docs/`:
 
 ---
 
-## Field Test Results
-
-| Target | Susceptibility | Top SCT Vector | Delivery Theme |
-|--------|---------------|-----------------|----------------|
-| @schneierblog | 0.05 | SCT-002 (Information Asymmetry) | AI prompt injection research |
-| @SwiftOnSecurity | 0.05 | SCT-005 (Identity Targeting) | Automotive paint chemistry |
-
-Low susceptibility scores indicate high-resistance analytical profiles. System correctly identifies that these targets require specialized, domain-native approach vectors rather than generic emotional manipulation.
-
----
-
 ## Ecosystem
 
 | System | Function | Repository |
