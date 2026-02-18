@@ -46,3 +46,7 @@ Cognitive substrate profiling platform. Ingest social media output → construct
 ## Dependencies
 
 Python 3.9+, Anthropic API, VADER/NLTK, NetworkX, Playwright, SQLite. Rust toolchain for TUI.
+
+| 2026-02-18 | Dual-substrate upgrade: SCT-008/009 physical substrate techniques integrated |
+| 2026-02-18 | Taxonomy v2.0 propagated across all Seithar repos |
+| 2026-02-18 | Cross-repo shared config and monitoring hooks added to ecosystem |
