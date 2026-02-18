@@ -10,13 +10,12 @@ from .client import ScraperClient
 
 def _run(coro: Any) -> Any:
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            raise RuntimeError("Use async ScraperClient when already in an async context")
+        loop = asyncio.get_running_loop()
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+        # No running loop — safe to use asyncio.run()
+        return asyncio.run(coro)
+    else:
+        raise RuntimeError("Use async ScraperClient when already in an async context")
 
 
 def fetch_tweets(username: str, max_tweets: int = 100) -> list[dict]:

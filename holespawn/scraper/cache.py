@@ -4,7 +4,7 @@ File-based cache for scraper responses. TTL by operation type.
 
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -45,8 +45,11 @@ class ScrapeCache:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             return None
-        cached_at = datetime.fromisoformat(data.get("cached_at", "2000-01-01T00:00:00"))
-        if datetime.utcnow() - cached_at > timedelta(hours=ttl_hours):
+        cached_at_str = data.get("cached_at", "2000-01-01T00:00:00")
+        cached_at = datetime.fromisoformat(cached_at_str)
+        if cached_at.tzinfo is None:
+            cached_at = cached_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - cached_at > timedelta(hours=ttl_hours):
             try:
                 path.unlink()
             except OSError:
@@ -65,7 +68,7 @@ class ScrapeCache:
         key = self._key(operation, username, **params)
         path = self.cache_dir / f"{key}.json"
         data = {
-            "cached_at": datetime.utcnow().isoformat(),
+            "cached_at": datetime.now(timezone.utc).isoformat(),
             "operation": operation,
             "username": username,
             "payload": payload,

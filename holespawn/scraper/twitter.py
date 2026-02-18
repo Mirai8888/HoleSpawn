@@ -380,7 +380,6 @@ class TwitterScraper:
             await stealth_page(page)
             tweets: list[dict] = []
             seen_ids: set[str] = set()
-            cursors_seen: set[str] = set()
 
             async def on_response(response) -> None:
                 url = response.url

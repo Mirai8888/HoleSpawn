@@ -92,7 +92,7 @@ class LinkedInScraper:
     async def __aexit__(self, *args: object) -> None:
         await self.close()
 
-    async def _get(self, url: str, params: dict | None = None) -> dict | None:
+    async def _get(self, url: str, params: dict | None = None, _retry: int = 0) -> dict | None:
         """Make a rate-limited GET request with error handling."""
         await self._rate_limiter.wait()
         client = await self._ensure_client()
@@ -111,10 +111,13 @@ class LinkedInScraper:
             logger.error("LinkedIn 403 Forbidden — possible CSRF issue or account restricted.")
             return None
         if r.status_code == 429:
+            if _retry >= 2:
+                logger.error("LinkedIn 429 rate limited after %d retries, giving up.", _retry)
+                return None
             retry_after = int(r.headers.get("retry-after", 60))
-            logger.warning("LinkedIn 429 rate limited. Sleeping %ds", retry_after)
+            logger.warning("LinkedIn 429 rate limited. Sleeping %ds (retry %d)", retry_after, _retry + 1)
             await asyncio.sleep(retry_after + random.uniform(5, 15))
-            return await self._get(url, params)  # one retry
+            return await self._get(url, params, _retry=_retry + 1)
         logger.warning("LinkedIn API returned %d for %s", r.status_code, url)
         return None
 
