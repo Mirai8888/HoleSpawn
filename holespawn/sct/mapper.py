@@ -144,20 +144,25 @@ class SCTMapper:
     Output: SCTVulnerabilityMap with scores 0.0-1.0 for each SCT code
     """
 
-    SCT_CODES = {
-        "SCT-001": "Emotional Hijacking",
-        "SCT-002": "Information Asymmetry Exploitation",
-        "SCT-003": "Authority Fabrication",
-        "SCT-004": "Social Proof Manipulation",
-        "SCT-005": "Identity Targeting",
-        "SCT-006": "Temporal Manipulation",
-        "SCT-007": "Recursive Infection",
-        "SCT-008": "Direct Substrate Intervention",
-        "SCT-009": "Chemical Disruption",
-        "SCT-010": "Sensory Channel Manipulation",
-        "SCT-011": "Trust Infrastructure Destruction",
-        "SCT-012": "Commitment Escalation",
-    }
+    # Import canonical names from taxonomy.py (single source of truth)
+    try:
+        from taxonomy import SCT_TAXONOMY as _TAX
+        SCT_CODES = {code: entry["name"] for code, entry in _TAX.items()}
+    except ImportError:
+        SCT_CODES = {
+            "SCT-001": "Emotional Hijacking",
+            "SCT-002": "Information Asymmetry Exploitation",
+            "SCT-003": "Authority Fabrication",
+            "SCT-004": "Social Proof Manipulation",
+            "SCT-005": "Identity Targeting",
+            "SCT-006": "Temporal Manipulation",
+            "SCT-007": "Recursive Infection",
+            "SCT-008": "Direct Substrate Intervention",
+            "SCT-009": "Chemical Substrate Disruption",
+            "SCT-010": "Sensory Channel Manipulation",
+            "SCT-011": "Trust Infrastructure Destruction",
+            "SCT-012": "Commitment Escalation & Self-Binding",
+        }
 
     def map(self, behavioral_matrix: dict[str, Any]) -> SCTVulnerabilityMap:
         """
