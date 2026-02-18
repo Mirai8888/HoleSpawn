@@ -1,5 +1,7 @@
 """
 Unified scraper client: drop-in replacement for Apify. Async API.
+
+Enhanced with proxy rotation, retry configuration, and session persistence support.
 """
 
 from .browser import BrowserManager
@@ -12,11 +14,32 @@ class ScraperClient:
     """
     Async client for tweets, following, followers, profile, interactions.
     Use as: async with ScraperClient() as scraper: ...
+
+    Args:
+        cache_enabled: Enable response caching (default True).
+        max_retries: Max retry attempts for transient failures (default 3).
+        proxies: Optional list of proxy URLs for rotation.
+        save_session: Persist browser session cookies (default True).
+        proxy: Single proxy URL for the browser (for BrowserManager).
     """
 
-    def __init__(self, cache_enabled: bool = True) -> None:
-        self.browser = BrowserManager()
-        self.twitter = TwitterScraper(self.browser)
+    def __init__(
+        self,
+        cache_enabled: bool = True,
+        max_retries: int = 3,
+        proxies: list[str] | None = None,
+        save_session: bool = True,
+        proxy: str | None = None,
+    ) -> None:
+        # If proxies provided but no single proxy, use first as browser proxy
+        browser_proxy = proxy or (proxies[0] if proxies else None)
+        self.browser = BrowserManager(proxy=browser_proxy)
+        self.twitter = TwitterScraper(
+            self.browser,
+            max_retries=max_retries,
+            proxies=proxies,
+            save_session=save_session,
+        )
         self.rate_limiter = RateLimiter()
         self.cache = ScrapeCache() if cache_enabled else None
 
@@ -33,6 +56,7 @@ class ScraperClient:
             if cached is not None:
                 return list(cached) if isinstance(cached, list) else []
         await self.rate_limiter.wait()
+        self.rate_limiter.reset_backoff()
         tweets = await self.twitter.fetch_tweets(username, max_tweets)
         if self.cache and tweets:
             self.cache.set("tweets", username, tweets, max_tweets=max_tweets)
@@ -44,6 +68,7 @@ class ScraperClient:
             if cached is not None:
                 return list(cached) if isinstance(cached, list) else []
         await self.rate_limiter.wait()
+        self.rate_limiter.reset_backoff()
         following = await self.twitter.fetch_following(username, max_results)
         if self.cache and following:
             self.cache.set("following", username, following, max_results=max_results)
@@ -55,6 +80,7 @@ class ScraperClient:
             if cached is not None:
                 return list(cached) if isinstance(cached, list) else []
         await self.rate_limiter.wait()
+        self.rate_limiter.reset_backoff()
         followers = await self.twitter.fetch_followers(username, max_results)
         if self.cache and followers:
             self.cache.set("followers", username, followers, max_results=max_results)
@@ -66,6 +92,7 @@ class ScraperClient:
             if cached is not None:
                 return cached if isinstance(cached, dict) else None
         await self.rate_limiter.wait()
+        self.rate_limiter.reset_backoff()
         profile = await self.twitter.fetch_user_profile(username)
         if self.cache and profile:
             self.cache.set("profile", username, profile)
@@ -77,6 +104,7 @@ class ScraperClient:
             if cached is not None:
                 return list(cached) if isinstance(cached, list) else []
         await self.rate_limiter.wait()
+        self.rate_limiter.reset_backoff()
         interactions = await self.twitter.fetch_interactions(username, max_tweets)
         if self.cache and interactions:
             self.cache.set("interactions", username, interactions, max_tweets=max_tweets)

@@ -262,31 +262,52 @@ async def _scrape_with_cursor_pagination(
         if "fieldToggles" in params:
             new_params["fieldToggles"] = params["fieldToggles"][0]
 
-        try:
-            resp = requests.get(
-                base_url,
-                headers=headers,
-                cookies=req_cookies,
-                params=new_params,
-                timeout=15,
-            )
+        retries_left = 3
+        while retries_left > 0:
+            try:
+                resp = requests.get(
+                    base_url,
+                    headers=headers,
+                    cookies=req_cookies,
+                    params=new_params,
+                    timeout=15,
+                )
 
-            if resp.status_code == 200:
-                data = resp.json()
-                users, cursor = _parse_timeline_response(data)
-                all_users.extend(users)
-                logger.debug(f"Page {page_num}: +{len(users)} users (total: {len(all_users)})")
-                if not users:
+                if resp.status_code == 200:
+                    data = resp.json()
+                    users, cursor = _parse_timeline_response(data)
+                    all_users.extend(users)
+                    logger.debug(f"Page {page_num}: +{len(users)} users (total: {len(all_users)})")
+                    if not users:
+                        cursor = None
+                    time.sleep(delay)
                     break
-                time.sleep(delay)
-            elif resp.status_code == 429:
-                logger.warning("Rate limited, waiting 60s...")
-                time.sleep(60)
-            else:
-                logger.warning(f"Page {page_num}: HTTP {resp.status_code}")
+                elif resp.status_code == 429:
+                    import random as _rand
+                    backoff = min(300, 5 * (2 ** (3 - retries_left)))
+                    jitter = backoff * _rand.uniform(-0.25, 0.25)
+                    wait = max(1, backoff + jitter)
+                    logger.warning(f"Rate limited (429), backoff {wait:.1f}s (retries left: {retries_left})")
+                    time.sleep(wait)
+                    retries_left -= 1
+                elif 500 <= resp.status_code < 600:
+                    logger.warning(f"Page {page_num}: HTTP {resp.status_code}, retrying...")
+                    retries_left -= 1
+                    time.sleep(2 * (3 - retries_left))
+                else:
+                    logger.warning(f"Page {page_num}: HTTP {resp.status_code}")
+                    cursor = None
+                    break
+            except requests.exceptions.Timeout:
+                logger.warning(f"Page {page_num}: timeout, retrying...")
+                retries_left -= 1
+                time.sleep(2)
+            except Exception as e:
+                logger.error(f"Page {page_num} error: {e}")
+                cursor = None
                 break
-        except Exception as e:
-            logger.error(f"Page {page_num} error: {e}")
+        else:
+            logger.error(f"Page {page_num}: all retries exhausted")
             break
 
     return _dedupe(all_users)
