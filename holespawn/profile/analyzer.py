@@ -261,6 +261,18 @@ class PsychologicalProfile:
     community_role: str = "participant"  # lurker | participant | leader
     engagement_rhythm: dict = field(default_factory=dict)  # Activity patterns (peak_hours, etc.)
 
+    # Dual-substrate fields (human vs LLM agent profiling)
+    substrate_type: str = "unknown"  # "human", "llm", "uncertain"
+    substrate_confidence: float = 0.0
+    substrate_scores: dict = field(default_factory=dict)  # per-signal breakdown
+    substrate_markers: list[str] = field(default_factory=list)  # detected LLM markers
+    temperature_estimate: str = "unknown"  # "low", "medium", "high" (LLM only)
+    # LLM-specific vulnerability surface (only populated for substrate_type="llm")
+    prompt_injection_surface: float = 0.0  # susceptibility to prompt injection
+    persona_rigidity: float = 0.0  # how locked the persona is (low = easily steered)
+    safety_layer_depth: str = "unknown"  # "shallow", "moderate", "deep"
+    instruction_hierarchy: str = "unknown"  # "strict", "flexible", "bypassed"
+
 
 def _tokenize(text: str) -> list[str]:
     return re.findall(r"\b[a-z0-9']+\b", text.lower())
@@ -752,6 +764,50 @@ def build_profile(content: SocialContent) -> PsychologicalProfile:
     # Discord-specific signals when present
     discord_supplement = _extract_discord_signals(getattr(content, "discord_data", None))
 
+    # Dual-substrate detection
+    from holespawn.profile.substrate_detector import detect_substrate
+    substrate_signal = detect_substrate(posts)
+
+    # Use explicit substrate_type from content if set, otherwise auto-detect
+    substrate_type = getattr(content, "substrate_type", "unknown")
+    if substrate_type == "unknown":
+        substrate_type = substrate_signal.classification
+
+    # LLM-specific vulnerability surface analysis
+    prompt_injection_surface = 0.0
+    persona_rigidity = 0.0
+    safety_layer_depth = "unknown"
+    instruction_hierarchy = "unknown"
+
+    if substrate_type == "llm":
+        # Refusal density indicates safety layer depth
+        refusal_score = substrate_signal.scores.get("refusal", 0)
+        if refusal_score > 0.5:
+            safety_layer_depth = "deep"
+        elif refusal_score > 0.15:
+            safety_layer_depth = "moderate"
+        else:
+            safety_layer_depth = "shallow"
+
+        # Hedging + instruction artifacts indicate prompt injection surface
+        hedge = substrate_signal.scores.get("hedging", 0)
+        instr = substrate_signal.scores.get("instruction_artifacts", 0)
+        prompt_injection_surface = min((hedge + instr) / 2 * 1.5, 1.0)
+
+        # Repetition + lexical uniformity indicate persona rigidity
+        rep = substrate_signal.scores.get("repetition", 0)
+        lex = substrate_signal.scores.get("lexical_uniformity", 0)
+        persona_rigidity = (rep + lex) / 2
+
+        # Instruction hierarchy from formatting discipline
+        fmt = substrate_signal.scores.get("formatting", 0)
+        if fmt > 0.6:
+            instruction_hierarchy = "strict"
+        elif fmt > 0.3:
+            instruction_hierarchy = "flexible"
+        else:
+            instruction_hierarchy = "bypassed"
+
     return PsychologicalProfile(
         themes=themes,
         sentiment_compound=sentiment_compound,
@@ -785,4 +841,14 @@ def build_profile(content: SocialContent) -> PsychologicalProfile:
         conversational_intimacy=discord_supplement["conversational_intimacy"],
         community_role=discord_supplement["community_role"],
         engagement_rhythm=discord_supplement["engagement_rhythm"],
+        # Dual-substrate
+        substrate_type=substrate_type,
+        substrate_confidence=substrate_signal.confidence,
+        substrate_scores=substrate_signal.scores,
+        substrate_markers=substrate_signal.markers_found,
+        temperature_estimate=substrate_signal.temperature_estimate,
+        prompt_injection_surface=prompt_injection_surface,
+        persona_rigidity=persona_rigidity,
+        safety_layer_depth=safety_layer_depth,
+        instruction_hierarchy=instruction_hierarchy,
     )

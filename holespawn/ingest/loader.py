@@ -20,6 +20,10 @@ class SocialContent:
     discord_data: dict | None = None
     # Image/media URLs from posts (e.g. Twitter); used to drive design system when available
     media_urls: list[str] = field(default_factory=list)
+    # Substrate type: "human", "llm", or "unknown" (auto-detected if not set)
+    substrate_type: str = "unknown"
+    # Model metadata (when known): model name, temperature, system prompt hash, etc.
+    model_metadata: dict | None = None
 
     def iter_posts(self) -> Iterator[str]:
         for p in self.posts:
