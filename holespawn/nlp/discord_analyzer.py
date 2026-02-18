@@ -82,8 +82,8 @@ def _sent_tokenize_simple(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"[.!?]+", text) if s.strip()]
 
 
-def _content_words() -> set[str]:
-    """Simple content-word heuristic (no NLTK)."""
+def _stop_words() -> set[str]:
+    """Common stop words for filtering."""
     stop = {
         "i",
         "me",
@@ -181,7 +181,7 @@ class DiscordNLPAnalyzer:
         avg_sent_len = (
             sum(len(_tokenize_simple(s)) for s in sentences) / len(sentences) if sentences else 0.0
         )
-        stop = _content_words()
+        stop = _stop_words()
         content_count = sum(1 for w in tokens if w not in stop)
         lexical_density = content_count / len(tokens) if tokens else 0.0
 
@@ -238,7 +238,7 @@ class DiscordNLPAnalyzer:
         for c in contents:
             t = _tokenize_simple(c)
             for i in range(len(t) - 1):
-                if t[i] not in _content_words() or t[i + 1] not in _content_words():
+                if t[i] not in _stop_words() or t[i + 1] not in _stop_words():
                     bigrams.append((t[i], t[i + 1]))
         phrase_patterns = [f"{a} {b}" for (a, b), _ in Counter(bigrams).most_common(20)]
 
@@ -318,7 +318,7 @@ class DiscordNLPAnalyzer:
         all_context_tokens = []
         for c in contexts:
             all_context_tokens.extend(_tokenize_simple(c))
-        stop = _content_words()
+        stop = _stop_words()
         trigger_counts = Counter(w for w in all_context_tokens if w not in stop and len(w) > 2)
         reaction_triggers = [w for w, _ in trigger_counts.most_common(15)]
 
@@ -361,7 +361,7 @@ class DiscordNLPAnalyzer:
                 topic_by_server[name] = []
             topic_by_server[name].extend(_tokenize_simple(c)[:50])
         for k in topic_by_server:
-            stop = _content_words()
+            stop = _stop_words()
             counts = Counter(w for w in topic_by_server[k] if w not in stop and len(w) > 2)
             topic_by_server[k] = [w for w, _ in counts.most_common(10)]
 
@@ -453,7 +453,7 @@ class DiscordNLPAnalyzer:
         all_tokens = []
         for c in contents:
             all_tokens.extend(_tokenize_simple(c))
-        stop = _content_words()
+        stop = _stop_words()
         counts = Counter(w for w in all_tokens if w not in stop and len(w) > 2)
         primary_topics = [(w, c / len(all_tokens)) for w, c in counts.most_common(15)]
 
@@ -469,14 +469,15 @@ class DiscordNLPAnalyzer:
             try:
                 vec = TfidfVectorizer(max_features=100, stop_words="english", ngram_range=(1, 2))
                 X = vec.fit_transform(contents)
-                nmf = NMF(n_components=min(5, len(contents) - 1), random_state=42)
-                W = nmf.fit_transform(X)
+                n_components = min(5, len(contents) - 1)
+                nmf = NMF(n_components=n_components, random_state=42)
+                nmf.fit_transform(X)
                 terms = vec.get_feature_names_out()
-                for i in range(W.shape[1]):
-                    top_idx = W[:, i].argsort()[-3:][::-1]
+                for i in range(n_components):
+                    top_idx = nmf.components_[i].argsort()[-3:][::-1]
                     top_words = [terms[j] for j in top_idx if j < len(terms)]
                     if top_words:
-                        primary_topics.append((top_words[0], float(W[:, i].max())))
+                        primary_topics.append((top_words[0], float(nmf.components_[i].max())))
             except Exception:
                 pass
 

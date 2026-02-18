@@ -12,11 +12,10 @@ def execute(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """Execute a single tool by name with given arguments. Returns result dict."""
     if tool_name in social_executor.TOOL_EXECUTORS:
         fn = social_executor.TOOL_EXECUTORS[tool_name]
-        try:
-            kwargs = {k: v for k, v in arguments.items() if k in fn.__code__.co_varnames}
-            return fn(**kwargs)
-        except TypeError:
-            return fn(**arguments)
+        import inspect
+        valid_params = set(inspect.signature(fn).parameters.keys())
+        kwargs = {k: v for k, v in arguments.items() if k in valid_params}
+        return fn(**kwargs)
 
     # Core tools (dashboard queue / ops)
     if tool_name == "profile_target":

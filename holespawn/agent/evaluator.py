@@ -30,7 +30,7 @@ def get_operation_state() -> dict[str, Any]:
             "engagements_count": len(engagements),
             "dms_sent": len(dms_sent),
             "trap_links_sent": len(with_trap),
-            "targets_with_trap": len(set(e.target_id for e in traps)),
+            "targets_with_trap": len(set(e.target_id for e in with_trap)),
         }
     except Exception:
         return {}
@@ -49,15 +49,6 @@ def evaluate_success_criteria(
     details: dict[str, dict[str, Any]] = {}
     all_met = True
     has_any_criteria = False
-
-    min_effectiveness = criteria.get("min_effectiveness")
-    if min_effectiveness is not None:
-        traps_70 = state.get("traps_70_plus", 0)
-        details["min_effectiveness"] = {
-            "required": f"traps with effectiveness >= {min_effectiveness}",
-            "actual": traps_70,
-            "met": traps_70 >= (criteria.get("min_successful_traps") or 1),
-        }
 
     min_successful_traps = criteria.get("min_successful_traps")
     if min_successful_traps is not None:

@@ -485,7 +485,7 @@ def _extract_obsessions(posts: list[str], themes: list[tuple[str, float]]) -> li
         theme_posts = [p for p in posts if theme in p.lower()]
         if not theme_posts:
             continue
-        has_intensity = any("!" in p or theme in p for p in theme_posts[:20])
+        has_intensity = any("!" in p for p in theme_posts[:20])
         if has_intensity or freq > 0.15:
             obsessions.append(theme)
     return obsessions[:8]
@@ -635,8 +635,6 @@ def _extract_discord_signals(discord_data: dict) -> dict:
         # Simple word extraction for themes they emotionally engage with
         combined = " ".join(reacted_contents).lower()
         words = re.findall(r"\b[a-z]{4,}\b", combined)
-        from collections import Counter
-
         stop = STOP | {
             "this",
             "that",

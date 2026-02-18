@@ -135,7 +135,7 @@ class AIRabbitHoleGenerator:
         else:
             if os.getenv("ANTHROPIC_API_KEY"):
                 self.provider = "anthropic"
-            elif os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_API_KEY"):
+            elif os.getenv("OPENAI_API_KEY"):
                 self.provider = "openai"
             else:
                 self.provider = "google"
@@ -145,7 +145,7 @@ class AIRabbitHoleGenerator:
         elif self.provider == "google":
             self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         else:
-            self.api_key = os.getenv("OPENAI_API_API_KEY") or os.getenv("OPENAI_API_KEY")
+            self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError(
                 "No API key found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY."
