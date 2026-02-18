@@ -18,12 +18,15 @@ from .github_scraper import scrape_github_user
 from .hackernews import scrape_hn_user
 from .mastodon import scrape_mastodon_user
 from .substack import scrape_substack
+from .linkedin import LinkedInScraper, scrape_linkedin_user
 
 __all__ = [
     "TwitterScraper",
+    "LinkedInScraper",
     "scrape_reddit_user",
     "scrape_github_user",
     "scrape_hn_user",
     "scrape_mastodon_user",
     "scrape_substack",
+    "scrape_linkedin_user",
 ]
