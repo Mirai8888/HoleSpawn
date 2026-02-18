@@ -12,13 +12,13 @@ Platforms:
   - GraphQL: Raw Twitter GraphQL operations (graphql.py)
 """
 
-from .twitter import TwitterScraper
-from .reddit import scrape_reddit_user
 from .github_scraper import scrape_github_user
 from .hackernews import scrape_hn_user
-from .mastodon import scrape_mastodon_user
-from .substack import scrape_substack
 from .linkedin import LinkedInScraper, scrape_linkedin_user
+from .mastodon import scrape_mastodon_user
+from .reddit import scrape_reddit_user
+from .substack import scrape_substack
+from .twitter import TwitterScraper
 
 __all__ = [
     "TwitterScraper",

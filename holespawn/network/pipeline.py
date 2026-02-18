@@ -10,7 +10,6 @@ from typing import Any
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.ingest.network import (
-    NetworkData,
     fetch_network_data,
     validate_network_data,
 )
@@ -20,8 +19,8 @@ from holespawn.network.graph_analysis import (
     network_analysis_to_dict,
 )
 from holespawn.network.node_profiler import NodeProfile, profile_key_nodes
-from holespawn.network.vulnerability_map import extract_community_themes, generate_network_report
 from holespawn.network.visualizer import generate_network_graph_html
+from holespawn.network.vulnerability_map import extract_community_themes, generate_network_report
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ def _top_key_node_usernames(analysis: NetworkAnalysis, top_n: int) -> list[str]:
             seen.add(u)
             out.append(u)
     # 2) At least one hub per community
-    for cid, metrics in analysis.community_metrics.items():
+    for _cid, metrics in analysis.community_metrics.items():
         hub = metrics.get("hub_node")
         if hub and hub not in seen:
             seen.add(hub)

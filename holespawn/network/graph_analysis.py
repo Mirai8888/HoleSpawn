@@ -123,20 +123,20 @@ def build_network_analysis(data: NetworkData) -> NetworkAnalysis:
         except Exception as e:
             logger.warning("Louvain failed: %s", e)
             result.communities = {0: list(G.nodes())}
-            result.node_community = {n: 0 for n in G.nodes()}
+            result.node_community = dict.fromkeys(G.nodes(), 0)
     else:
         result.communities = {0: list(G.nodes())}
-        result.node_community = {n: 0 for n in G.nodes()}
+        result.node_community = dict.fromkeys(G.nodes(), 0)
 
     # Centrality
     try:
         result.betweenness = nx.betweenness_centrality(G, weight="weight")
     except Exception:
-        result.betweenness = {n: 0.0 for n in G.nodes()}
+        result.betweenness = dict.fromkeys(G.nodes(), 0.0)
     try:
         result.eigenvector = nx.eigenvector_centrality(G, weight="weight", max_iter=500)
     except Exception:
-        result.eigenvector = {n: 0.0 for n in G.nodes()}
+        result.eigenvector = dict.fromkeys(G.nodes(), 0.0)
     result.in_degree = dict(G.in_degree())
     result.out_degree = dict(G.out_degree())
 
@@ -176,18 +176,17 @@ def build_network_analysis(data: NetworkData) -> NetworkAnalysis:
         )
 
     # Gatekeepers: high in-degree within community, low external
-    for cid, members in result.communities.items():
+    for gk_cid, members in result.communities.items():
         for node in members[:15]:
             in_d = result.in_degree.get(node, 0)
-            out_d = result.out_degree.get(node, 0)
             internal_in = sum(
-                1 for p in G.predecessors(node) if result.node_community.get(p) == cid
+                1 for p in G.predecessors(node) if result.node_community.get(p) == gk_cid
             )
             external_in = in_d - internal_in
             result.gatekeepers.append(
                 {
                     "username": node,
-                    "community_id": cid,
+                    "community_id": gk_cid,
                     "internal_degree": internal_in,
                     "external_degree": external_in,
                 }
@@ -215,9 +214,9 @@ def build_network_analysis(data: NetworkData) -> NetworkAnalysis:
             )
 
     # Community profiles (summary stats per community)
-    for cid, members in result.communities.items():
-        result.community_profiles[cid] = {
-            "theme": f"community_{cid}",
+    for cp_cid, members in result.communities.items():
+        result.community_profiles[cp_cid] = {
+            "theme": f"community_{cp_cid}",
             "size": len(members),
             "density": (
                 nx.density(G_undir.subgraph(members)) if len(members) > 1 else 0
@@ -284,7 +283,7 @@ def build_network_analysis(data: NetworkData) -> NetworkAnalysis:
             "role": role,
         }
     # Override hub: highest degree in each community
-    for cid, members in result.communities.items():
+    for _cid, members in result.communities.items():
         if not members:
             continue
         hub_node = max(members, key=lambda n: degree.get(n, 0))
@@ -299,12 +298,12 @@ def build_network_analysis(data: NetworkData) -> NetworkAnalysis:
                 result.node_metrics[node]["role"] = "hub"
 
     # Community metrics
-    for cid, members in result.communities.items():
+    for cm_cid, members in result.communities.items():
         sub = G_undir.subgraph(members) if len(members) > 1 else None
         density = float(nx.density(sub)) if sub and sub.number_of_edges() else 0.0
         hub_node = max(members, key=lambda n: degree.get(n, 0)) if members else None
         bridge_count = sum(1 for b in result.bridge_nodes if b["username"] in members)
-        result.community_metrics[cid] = {
+        result.community_metrics[cm_cid] = {
             "size": len(members),
             "density": round(density, 4),
             "hub_node": hub_node,

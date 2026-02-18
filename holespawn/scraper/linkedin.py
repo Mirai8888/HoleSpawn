@@ -6,7 +6,6 @@ No Playwright needed; uses requests with cookies exported from browser.
 import asyncio
 import json
 import logging
-import time
 import random
 from pathlib import Path
 from typing import Any
@@ -377,7 +376,9 @@ async def scrape_linkedin_user(
     for pos in data.get("positions", []):
         desc = pos.get("description", "")
         if desc:
-            label = f"{pos.get('title', '')} at {pos.get('company', '')}".strip(" at ")
+            title = pos.get('title', '').strip()
+            company = pos.get('company', '').strip()
+            label = f"{title} at {company}" if title and company else title or company
             text = f"{label}: {desc}" if label else desc
             items.append({
                 "text": text,

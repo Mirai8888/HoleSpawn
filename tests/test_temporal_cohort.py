@@ -1,9 +1,8 @@
 """Tests for Phase 4 cohort aggregation over temporal series."""
 
+import sqlite3
 import tempfile
 from pathlib import Path
-
-import sqlite3
 
 from holespawn.temporal import (
     aggregate_cohort,

@@ -47,8 +47,8 @@ def generate_network_graph_html(
         random.shuffle(rest)
         keep = list(priority) + rest[: MAX_VIZ_NODES - len(priority)]
         nodes = [n for n in nodes if n in keep]
-        edge_set = {(e["source"], e["target"]) for e in edges}
-        edges = [e for e in edges if e["source"] in keep and e["target"] in keep]
+        keep_set = set(keep)
+        edges = [e for e in edges if e["source"] in keep_set and e["target"] in keep_set]
 
     node_data = []
     for n in nodes:

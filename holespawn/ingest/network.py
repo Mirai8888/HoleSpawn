@@ -97,8 +97,13 @@ def _fetch_tweet_items_apify(username: str, max_tweets: int = 500) -> list[dict[
     if not username:
         return []
     try:
-        from holespawn.ingest.apify_twitter import APIFY_TWITTER_ACTOR, SCRAPER_FALLBACKS, _run_apify_raw
         from apify_client import ApifyClient
+
+        from holespawn.ingest.apify_twitter import (
+            APIFY_TWITTER_ACTOR,
+            SCRAPER_FALLBACKS,
+            _run_apify_raw,
+        )
     except Exception:
         return []
     client = ApifyClient(token)

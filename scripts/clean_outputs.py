@@ -61,7 +61,7 @@ def clean_outputs(base: Path, dry_run: bool) -> None:
     for path, ts, username in candidates:
         key = username.lower()
         by_user.setdefault(key, []).append((path, ts))
-    for key, list_of_paths in by_user.items():
+    for _key, list_of_paths in by_user.items():
         list_of_paths.sort(key=lambda x: x[1], reverse=True)
         for path in [p for p, _ in list_of_paths[1:]]:
             if dry_run:

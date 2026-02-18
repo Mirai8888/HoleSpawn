@@ -7,8 +7,8 @@ from flask import Blueprint, jsonify, request
 from dashboard.db import get_db
 from dashboard.db import operations as ops
 from dashboard.services.monitor import get_monitor
-from dashboard.services.analytics import AnalyticsEngine
-from .auth import login_required, _audit
+
+from .auth import _audit, login_required
 
 traps_bp = Blueprint("traps", __name__, url_prefix="/api/traps")
 

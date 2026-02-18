@@ -3,7 +3,7 @@ Campaign orchestration API: CRUD, add/remove targets, start/pause, status.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 
@@ -11,10 +11,10 @@ from dashboard.db import get_db
 from dashboard.db import operations as ops
 from dashboard.services.analytics import AnalyticsEngine
 
-from .auth import login_required, _audit
+from .auth import _audit, login_required
 
 
-def _parse_datetime(value: Any) -> Optional[datetime]:
+def _parse_datetime(value: Any) -> datetime | None:
     """Parse ISO datetime string to datetime; return None if invalid or not a string."""
     if value is None:
         return None

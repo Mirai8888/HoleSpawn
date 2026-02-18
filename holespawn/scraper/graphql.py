@@ -20,8 +20,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Optional
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import parse_qs, urlparse
 
 from playwright.async_api import async_playwright
 
@@ -49,7 +48,7 @@ def _clean_cookies(raw: list[dict]) -> list[dict]:
     return clean
 
 
-def _parse_timeline_response(data: dict) -> tuple[list[dict], Optional[str]]:
+def _parse_timeline_response(data: dict) -> tuple[list[dict], str | None]:
     """Extract user objects and bottom cursor from a GraphQL timeline response."""
     users = []
     cursor = None
@@ -114,7 +113,7 @@ def _dedupe(users: list[dict]) -> list[dict]:
 
 async def scrape_network(
     target: str,
-    cookie_path: Optional[str] = None,
+    cookie_path: str | None = None,
     include_followers: bool = True,
     include_following: bool = True,
     rate_limit_delay: float = 1.0,
@@ -351,7 +350,7 @@ async def _scrape_with_dom_scroll(
             const pc = document.querySelector('[data-testid="primaryColumn"]');
             if (pc) { pc.scrollTop += 1000; }
         """)
-        
+
         # Alternate keyboard methods
         keys = ["Space", "PageDown", "End"]
         await page.keyboard.press(keys[i % 3])
@@ -379,7 +378,7 @@ async def _scrape_with_dom_scroll(
 
 async def scrape_user_profile(
     ctx, screen_name: str
-) -> Optional[dict]:
+) -> dict | None:
     """Scrape a single user's profile data via their profile page."""
     page = await ctx.new_page()
     profile_data = {}

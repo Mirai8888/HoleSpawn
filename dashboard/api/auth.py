@@ -5,6 +5,7 @@ Passphrase-based; audit log for operations.
 
 import os
 from functools import wraps
+
 from flask import Blueprint, jsonify, request, session
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")

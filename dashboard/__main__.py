@@ -34,8 +34,9 @@ def cmd_init_db(args):
 
 
 def cmd_worker(args):
-    from dashboard.services.queue import JobQueue
     import time
+
+    from dashboard.services.queue import JobQueue
     q = JobQueue()
     print("Worker running (Ctrl+C to stop)...")
     try:

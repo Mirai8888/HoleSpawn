@@ -4,16 +4,17 @@ Wired to HoleSpawn ingest, profile, and site_builder.
 """
 
 import time
+from collections.abc import Callable
 from dataclasses import asdict, fields
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 from dashboard.db import get_db
 from dashboard.db import operations as ops
 
 
-def _profile_from_dict(data: Dict[str, Any]):
+def _profile_from_dict(data: dict[str, Any]):
     """Build PsychologicalProfile from stored JSON (only known fields)."""
     from holespawn.profile import PsychologicalProfile
     valid = {f.name for f in fields(PsychologicalProfile)}
@@ -34,16 +35,16 @@ class JobQueue:
     Enqueue jobs; a worker (or inline) processes them.
     """
 
-    def __init__(self, runner: Optional[Callable[[str, Optional[int], Dict], Any]] = None):
+    def __init__(self, runner: Callable[[str, int | None, dict], Any] | None = None):
         self._runner = runner  # (job_type, target_id, params) -> result or raise
 
-    def enqueue(self, job_type: str, target_id: Optional[int] = None, params: Optional[Dict] = None, priority: int = 0) -> int:
+    def enqueue(self, job_type: str, target_id: int | None = None, params: dict | None = None, priority: int = 0) -> int:
         """Add job to queue; returns job_id."""
         with get_db() as db:
             j = ops.create_job(db, job_type=job_type, target_id=target_id, params=params, priority=priority)
             return j.id
 
-    def get_status(self, job_id: int) -> Optional[Dict[str, Any]]:
+    def get_status(self, job_id: int) -> dict[str, Any] | None:
         """Get job status and progress."""
         with get_db() as db:
             j = ops.get_job(db, job_id)
@@ -85,7 +86,7 @@ class JobQueue:
                 ops.update_job(db, job_id, status="failed", error=str(e), completed_at=datetime.utcnow())
             return False
 
-    def _execute_job(self, job_type: str, target_id: Optional[int], params: Dict) -> Dict[str, Any]:
+    def _execute_job(self, job_type: str, target_id: int | None, params: dict) -> dict[str, Any]:
         """Execute a job based on its type using HoleSpawn pipelines."""
         if job_type == "profile":
             return self._run_profile(target_id, params)
@@ -97,7 +98,7 @@ class JobQueue:
             return self._run_scrape(target_id, params)
         raise ValueError(f"Unknown job type: {job_type}")
 
-    def _run_profile(self, target_id: Optional[int], params: Dict) -> Dict[str, Any]:
+    def _run_profile(self, target_id: int | None, params: dict) -> dict[str, Any]:
         """Build psychological profile for target from raw_data."""
         if target_id is None:
             raise ValueError("profile job requires target_id")
@@ -144,7 +145,7 @@ class JobQueue:
             )
         return {"status": "completed", "target_id": target_id}
 
-    def _run_generate_trap(self, target_id: Optional[int], params: Dict) -> Dict[str, Any]:
+    def _run_generate_trap(self, target_id: int | None, params: dict) -> dict[str, Any]:
         """Generate trap site from target profile."""
         if target_id is None:
             raise ValueError("generate_trap job requires target_id")
@@ -185,7 +186,7 @@ class JobQueue:
             )
         return {"status": "completed", "trap_id": trap.id, "path": str(output_dir)}
 
-    def _run_deploy(self, params: Dict) -> Dict[str, Any]:
+    def _run_deploy(self, params: dict) -> dict[str, Any]:
         """Mark trap as deployed (placeholder; wire to Netlify/Vercel later)."""
         trap_id = params.get("trap_id")
         if trap_id is None:
@@ -198,7 +199,7 @@ class JobQueue:
             ops.update_trap(db, trap_id, url=url, is_active=True)
         return {"status": "completed", "url": url, "trap_id": trap_id}
 
-    def _run_scrape(self, target_id: Optional[int], params: Dict) -> Dict[str, Any]:
+    def _run_scrape(self, target_id: int | None, params: dict) -> dict[str, Any]:
         """Placeholder for scrape; wire to Apify or ingest when needed."""
         return {"status": "stub", "target_id": target_id, "message": "Scrape not implemented; add data via API or import"}
 

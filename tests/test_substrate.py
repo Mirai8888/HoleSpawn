@@ -1,10 +1,8 @@
 """Tests for dual-substrate detection and LLM profiling."""
 
-import pytest
-from holespawn.profile.substrate_detector import detect_substrate, SubstrateSignal
-from holespawn.ingest.loader import SocialContent, load_from_text
+from holespawn.ingest.loader import load_from_text
 from holespawn.profile.analyzer import build_profile
-
+from holespawn.profile.substrate_detector import detect_substrate
 
 # --- Sample data ---
 

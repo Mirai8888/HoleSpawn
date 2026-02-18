@@ -7,9 +7,9 @@ Temporal NLP over recordings (Phase 3) and cohort aggregation (Phase 4).
   drift metrics. LLM summarization is layered on top of this JSON.
 """
 
+from .cohort import aggregate_cohort, build_cohort_results
 from .query import list_recordings, list_subjects
 from .series import build_series, compute_signature
-from .cohort import build_cohort_results, aggregate_cohort
 
 __all__ = [
     "list_recordings",

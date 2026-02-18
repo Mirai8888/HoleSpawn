@@ -188,7 +188,7 @@ def to_markdown() -> str:
         lines.append(f"**{entry['description']}**\n")
         lines.append(f"- Cyber analog: {entry['cyber_analog']}")
         lines.append(f"- Cognitive analog: {entry['cognitive_analog']}")
-        lines.append(f"- Indicators:")
+        lines.append("- Indicators:")
         for ind in entry["indicators"]:
             lines.append(f"  - {ind}")
         lines.append("")

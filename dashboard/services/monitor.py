@@ -3,13 +3,13 @@ Real-time monitoring of active traps.
 Tracks visits, engagement, effectiveness; emits events for WebSocket/alerts.
 """
 
-import json
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from dashboard.db import get_db
-from dashboard.db.models import Trap, Visit
 from dashboard.db import operations as ops
+from dashboard.db.models import Visit
 
 
 class TrapMonitor:
@@ -19,10 +19,10 @@ class TrapMonitor:
     - Emits events for live dashboard (WebSocket)
     """
 
-    def __init__(self, on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None):
+    def __init__(self, on_event: Callable[[str, dict[str, Any]], None] | None = None):
         self._on_event = on_event or (lambda _t, _d: None)
 
-    def emit(self, event_type: str, data: Dict[str, Any]) -> None:
+    def emit(self, event_type: str, data: dict[str, Any]) -> None:
         """Send event to dashboard (e.g. WebSocket)."""
         self._on_event(event_type, data)
 
@@ -30,12 +30,12 @@ class TrapMonitor:
         self,
         trap_id: int,
         target_id: int,
-        session_id: Optional[str] = None,
-        fingerprint: Optional[str] = None,
-        entry_page: Optional[str] = None,
-        referrer: Optional[str] = None,
-        utm_params: Optional[Dict] = None,
-    ) -> Optional[int]:
+        session_id: str | None = None,
+        fingerprint: str | None = None,
+        entry_page: str | None = None,
+        referrer: str | None = None,
+        utm_params: dict | None = None,
+    ) -> int | None:
         """Record visit start; returns visit_id."""
         with get_db() as db:
             trap = ops.get_trap(db, trap_id)
@@ -63,13 +63,13 @@ class TrapMonitor:
         trap_id: int,
         session_id: str,
         duration: float,
-        exit_page: Optional[str] = None,
-        pages_visited: Optional[List[str]] = None,
-        depth: Optional[int] = None,
-        scroll_depth: Optional[Dict] = None,
-        clicks: Optional[Dict] = None,
-        time_per_page: Optional[Dict] = None,
-    ) -> Optional[Any]:
+        exit_page: str | None = None,
+        pages_visited: list[str] | None = None,
+        depth: int | None = None,
+        scroll_depth: dict | None = None,
+        clicks: dict | None = None,
+        time_per_page: dict | None = None,
+    ) -> Any | None:
         """Record visit end and update trap metrics."""
         visit = None
         with get_db() as db:
@@ -144,7 +144,7 @@ class TrapMonitor:
         avg_depth = sum((v.depth or 0) for v in completed) / len(completed)
 
         # Return rate: unique fingerprints with >1 visit
-        fingerprints: Dict[str, int] = {}
+        fingerprints: dict[str, int] = {}
         for v in visits:
             fp = v.visitor_fingerprint or v.session_id or str(v.id)
             fingerprints[fp] = fingerprints.get(fp, 0) + 1
@@ -165,6 +165,6 @@ class TrapMonitor:
             return score
 
 
-def get_monitor(on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None) -> TrapMonitor:
+def get_monitor(on_event: Callable[[str, dict[str, Any]], None] | None = None) -> TrapMonitor:
     """Factory for TrapMonitor with optional event callback."""
     return TrapMonitor(on_event=on_event)

@@ -8,6 +8,7 @@ from dashboard.db import get_db
 from dashboard.db import operations as ops
 from dashboard.services.analytics import AnalyticsEngine
 from dashboard.services.network_analysis import NetworkAnalysisService
+
 from .auth import login_required
 
 intel_bp = Blueprint("intel", __name__, url_prefix="/api/intel")

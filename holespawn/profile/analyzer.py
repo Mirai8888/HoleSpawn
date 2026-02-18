@@ -194,18 +194,16 @@ STOP = {
     "easy", "far", "close", "high", "low", "small", "large",
     # URL fragments and social media noise
     "com", "www", "https", "http", "org", "net", "io", "co",
-    "pic", "twitter", "status", "utm", "ref", "source", "amp",
-    "lol", "lmao", "omg", "tbh", "imo", "imho", "smh", "ngl",
+    "pic", "twitter", "status", "utm", "ref", "source", "lol", "lmao", "omg", "tbh", "imo", "imho", "smh", "ngl",
     # Additional common non-meaningful words
-    "yes", "no", "per", "would", "could", "might", "may", "must",
-    "shall", "will", "won", "re", "ve", "ll", "isn", "aren", "wasn",
+    "yes", "per", "would", "could", "might", "may", "must",
+    "shall", "won", "re", "ve", "ll", "isn", "aren", "wasn",
     "weren", "haven", "hasn", "hadn", "wouldn", "shouldn", "couldn",
-    "doesn", "didn", "won", "super", "totally", "finally", "especially",
-    "please", "thanks", "thank", "sorry", "okay", "ok", "oh", "well",
-    "hey", "hi", "hello", "yeah", "yep", "nope", "nah", "hmm",
+    "doesn", "didn", "super", "totally", "finally", "especially",
+    "please", "thanks", "thank", "sorry", "okay", "ok", "oh", "hey", "hi", "hello", "yeah", "yep", "nope", "nah", "hmm",
     "watching", "version", "final", "happen", "happened", "happening",
-    "goes", "mean", "means", "set", "run", "running", "read", "reading",
-    "writes", "write", "writing", "saw", "seen", "hear", "heard",
+    "mean", "means", "set", "run", "running", "read", "reading",
+    "writes", "write", "writing", "seen", "hear", "heard",
     "believe", "guess", "hope", "wish", "wonder",
 }
 

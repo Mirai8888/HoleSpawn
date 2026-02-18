@@ -2,13 +2,13 @@
 Target management API: CRUD, profile queue, scrape, NLP.
 """
 
-import json
 from flask import Blueprint, jsonify, request
 
 from dashboard.db import get_db
 from dashboard.db import operations as ops
 from dashboard.services.queue import JobQueue
-from .auth import login_required, _audit
+
+from .auth import _audit, login_required
 
 targets_bp = Blueprint("targets", __name__, url_prefix="/api/targets")
 

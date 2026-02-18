@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from dashboard.db import get_db
 from dashboard.db import operations as ops
 from dashboard.services.queue import JobQueue
+
 from .auth import login_required
 
 jobs_bp = Blueprint("jobs", __name__, url_prefix="/api/jobs")

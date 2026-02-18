@@ -13,8 +13,8 @@ from typing import Any
 from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import fetch_twitter_apify
 from holespawn.llm import call_llm
-from holespawn.profile import build_profile
 from holespawn.network.graph_analysis import NetworkAnalysis
+from holespawn.profile import build_profile
 
 logger = logging.getLogger(__name__)
 

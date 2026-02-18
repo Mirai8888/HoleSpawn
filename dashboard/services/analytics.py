@@ -3,14 +3,13 @@ Analytics engine: campaign rollups, effectiveness patterns, predictions.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from dashboard.db import get_db
 from dashboard.db import operations as ops
-from dashboard.db.models import Trap, Visit, Campaign, CampaignTarget
 
 
-def _json_load(s: Optional[str]) -> Any:
+def _json_load(s: str | None) -> Any:
     if s is None:
         return None
     try:
@@ -22,7 +21,7 @@ def _json_load(s: Optional[str]) -> Any:
 class AnalyticsEngine:
     """Advanced analytics on trap and campaign performance."""
 
-    def aggregate_campaign_metrics(self, campaign_id: int) -> Dict[str, Any]:
+    def aggregate_campaign_metrics(self, campaign_id: int) -> dict[str, Any]:
         """Roll up metrics across all traps in campaign."""
         with get_db() as db:
             campaign = ops.get_campaign(db, campaign_id)
@@ -31,9 +30,9 @@ class AnalyticsEngine:
             traps = ops.list_traps(db, campaign_id=campaign_id)
             total_visits = 0
             total_unique = 0
-            durations: List[float] = []
-            depths: List[float] = []
-            effectivenesses: List[float] = []
+            durations: list[float] = []
+            depths: list[float] = []
+            effectivenesses: list[float] = []
             for t in traps:
                 total_visits += t.total_visits or 0
                 total_unique += t.unique_visitors or 0
@@ -54,14 +53,14 @@ class AnalyticsEngine:
                 "avg_effectiveness": sum(effectivenesses) / len(effectivenesses) if effectivenesses else None,
             }
 
-    def identify_patterns(self) -> Dict[str, Any]:
+    def identify_patterns(self) -> dict[str, Any]:
         """
         Find patterns in what works: profile types -> architectures, design -> engagement.
         """
         with get_db() as db:
             traps = ops.list_traps(db, limit=500)
-            by_arch: Dict[str, List[float]] = {}
-            by_platform: Dict[str, List[float]] = {}
+            by_arch: dict[str, list[float]] = {}
+            by_platform: dict[str, list[float]] = {}
             for t in traps:
                 eff = t.trap_effectiveness
                 if eff is None:
@@ -79,7 +78,7 @@ class AnalyticsEngine:
                 "recommendation": max(arch_avg, key=arch_avg.get) if arch_avg else None,
             }
 
-    def predict_effectiveness(self, profile: Dict[str, Any], architecture: Optional[str] = None) -> float:
+    def predict_effectiveness(self, profile: dict[str, Any], architecture: str | None = None) -> float:
         """Predict effectiveness for a profile type from historical patterns."""
         patterns = self.identify_patterns()
         arch_avg = patterns.get("by_architecture") or {}

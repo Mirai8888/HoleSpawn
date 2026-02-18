@@ -14,11 +14,10 @@ Signals used:
 Returns a SubstrateSignal with classification and confidence.
 """
 
-import re
 import math
+import re
 from collections import Counter
 from dataclasses import dataclass, field
-
 
 # --- Marker lexicons ---
 

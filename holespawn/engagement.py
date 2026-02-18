@@ -9,8 +9,8 @@ from holespawn.cost_tracker import CostTracker
 from holespawn.ingest import SocialContent
 from holespawn.llm import call_llm
 from holespawn.profile import PsychologicalProfile
-from holespawn.sct.mapper import SCTMapper
 from holespawn.sct.enhancer import enhance_engagement
+from holespawn.sct.mapper import SCTMapper
 
 ENGAGEMENT_SYSTEM = """You are an analyst producing a **narrative engineering** brief. The goal is to profile one person so they can be shaped or steered through narrative — i.e. what stories, information flows, and social dynamics will move them toward desired beliefs, actions, or roles.
 

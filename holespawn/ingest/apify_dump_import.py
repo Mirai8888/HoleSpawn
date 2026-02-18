@@ -21,12 +21,12 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .apify_twitter import _item_to_text
-
 
 APIFY_DUMP_DIR = Path("apify_dump")
 OUTPUT_ROOT = Path("data") / "apify_handles"

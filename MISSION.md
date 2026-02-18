@@ -13,6 +13,7 @@ Cognitive substrate profiling platform. Ingest social media output → construct
 - Core profiling pipeline: ingest → NLP → LLM profile → behavioral matrix → engagement architecture
 - SCT integration: algorithmic SCT-001 through SCT-012 vulnerability mapping (`holespawn.sct`)
 - Network analysis v2: community detection, bridge identification, node profiling
+- Network analytical engine v3: graph_builder (weighted/temporal digraphs), influence_flow (seeding/amplification/bridges/composite scores), vulnerability (fragmentation/SPOFs/cohesion/attack surfaces), temporal (snapshot diff/community evolution/trends), content_overlay (topic mapping/belief clustering/narrative divergence/sentiment flow)
 - NLP pipeline: 200+ stopwords, 7 communication style categories, improved theme extraction
 - Delivery system v1: profile + binding protocol → LLM message → file/stdout
 - Recording daemon: scheduled Twitter snapshots into timestamped JSON + SQLite index
@@ -47,6 +48,7 @@ Cognitive substrate profiling platform. Ingest social media output → construct
 
 Python 3.9+, Anthropic API, VADER/NLTK, NetworkX, Playwright, SQLite. Rust toolchain for TUI.
 
+| 2026-02-18 | Network analytical engine v3: graph_builder, influence_flow, vulnerability, temporal, content_overlay |
 | 2026-02-18 | Dual-substrate upgrade: SCT-008/009 physical substrate techniques integrated |
 | 2026-02-18 | Taxonomy v2.0 propagated across all Seithar repos |
 | 2026-02-18 | Cross-repo shared config and monitoring hooks added to ecosystem |

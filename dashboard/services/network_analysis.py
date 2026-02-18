@@ -3,7 +3,7 @@ Network analysis service: wrap holespawn network analyzer, persist to C2 Network
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from dashboard.db import get_db
 from dashboard.db import operations as ops
@@ -19,14 +19,14 @@ def _ensure_sys_path():
 class NetworkAnalysisService:
     """Build network graphs and store in C2 networks table."""
 
-    def build_from_profiles_dir(self, dir_path: str, name: Optional[str] = None) -> Optional[int]:
+    def build_from_profiles_dir(self, dir_path: str, name: str | None = None) -> int | None:
         """
         Load profiles from directory, run community/centrality via NetworkAnalyzer, save as Network.
         Returns network_id or None.
         """
         _ensure_sys_path()
         try:
-            from holespawn.network.analyzer import load_profiles_from_dir, NetworkAnalyzer
+            from holespawn.network.analyzer import NetworkAnalyzer, load_profiles_from_dir
         except ImportError:
             return None
 
@@ -44,7 +44,7 @@ class NetworkAnalysisService:
         central_nodes = report.get("central_accounts") or []
         influence_map = report.get("betweenness_centrality") or {}
         # Build placeholder edges from clusters (same-cluster pairs) for viz if needed; else empty
-        edge_list: List[Dict[str, Any]] = []
+        edge_list: list[dict[str, Any]] = []
 
         with get_db() as db:
             n = ops.create_network(
@@ -59,7 +59,7 @@ class NetworkAnalysisService:
             )
             return n.id
 
-    def get_network_graph(self, network_id: int) -> Dict[str, Any]:
+    def get_network_graph(self, network_id: int) -> dict[str, Any]:
         """Return nodes, edges, communities for frontend viz."""
         with get_db() as db:
             n = ops.get_network(db, network_id)

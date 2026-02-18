@@ -7,7 +7,6 @@ CLI for network analysis. Two modes:
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
 

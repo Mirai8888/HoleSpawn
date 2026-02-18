@@ -22,7 +22,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from playwright.async_api import async_playwright
@@ -230,7 +230,7 @@ async def _scrape_one_following(page, req_cookies, handle, following_count,
         features = params["features"][0]
 
         max_pages = min(following_count // 50 + 2, 100)
-        for pg in range(max_pages):
+        for _pg in range(max_pages):
             new_vars = orig_vars.copy()
             new_vars["cursor"] = cursor
 

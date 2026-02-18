@@ -7,7 +7,6 @@ an SCT-optimized addendum with targeted exploitation strategies.
 """
 
 import logging
-from typing import Any
 
 from holespawn.cost_tracker import CostTracker
 from holespawn.llm import call_llm
@@ -57,7 +56,7 @@ def enhance_engagement(
 ) -> str:
     """
     Generate SCT-enhanced engagement addendum.
-    
+
     Returns markdown string to append to existing engagement brief.
     """
     # Build vulnerability summary for prompt

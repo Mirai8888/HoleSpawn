@@ -77,7 +77,7 @@ def generate_sct_report(
 ) -> str:
     """
     Generate a complete SCT Vulnerability Report from a behavioral matrix.
-    
+
     Returns markdown string.
     """
     mapper = SCTMapper()
@@ -86,9 +86,9 @@ def generate_sct_report(
     report = f"""# SCT VULNERABILITY REPORT
 ## Target: {target_id}
 
-**Classification:** SEITHAR GROUP — Cognitive Substrate Analysis  
-**Taxonomy Version:** SCT-001 through SCT-012  
-**Overall Susceptibility Index:** {vuln_map.overall_susceptibility:.2f}  
+**Classification:** SEITHAR GROUP — Cognitive Substrate Analysis
+**Taxonomy Version:** SCT-001 through SCT-012
+**Overall Susceptibility Index:** {vuln_map.overall_susceptibility:.2f}
 
 ---
 
@@ -117,7 +117,7 @@ Factors that may reduce effectiveness of SCT exploitation:
     else:
         report += "- No significant resistance factors detected. Target shows broad vulnerability surface.\n"
 
-    report += f"""
+    report += """
 ## Defensive Briefing
 
 If this target were to receive inoculation training, focus on:
@@ -130,8 +130,8 @@ If this target were to receive inoculation training, focus on:
     report += """
 ---
 
-*Seithar Group Intelligence and Research Division*  
-*認知作戦 | seithar.com*  
+*Seithar Group Intelligence and Research Division*
+*認知作戦 | seithar.com*
 *SCT Taxonomy: github.com/Mirai8888/seithar-cogdef*
 """
     return report

@@ -10,7 +10,8 @@ import os
 from typing import Any
 
 from holespawn.errors import ApifyError, ScraperError
-from holespawn.scraper.sync import fetch_tweets, fetch_tweets_raw as _fetch_tweets_raw
+from holespawn.scraper.sync import fetch_tweets
+from holespawn.scraper.sync import fetch_tweets_raw as _fetch_tweets_raw
 
 from .loader import SocialContent
 

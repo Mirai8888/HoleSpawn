@@ -1,6 +1,6 @@
 """Tests for SCT vulnerability mapping."""
 
-from holespawn.sct.mapper import SCTMapper, SCTVulnerabilityMap
+from holespawn.sct.mapper import SCTMapper
 from holespawn.sct.report import generate_sct_report
 
 

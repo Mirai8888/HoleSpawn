@@ -15,8 +15,9 @@ JSON this module produces; no LLM is invoked here.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .series import build_series, compute_signature
 

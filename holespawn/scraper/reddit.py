@@ -4,7 +4,6 @@ No API key required.
 """
 
 import logging
-import re
 from typing import Any
 
 import httpx

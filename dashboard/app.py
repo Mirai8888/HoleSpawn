@@ -33,6 +33,7 @@ except ImportError:
 
 from flask import Flask, jsonify, request, send_from_directory
 
+
 # Legacy DB path (profiles, network_reports)
 def _db_path() -> Path:
     p = os.getenv("HOLESPAWN_DB", "")
@@ -54,7 +55,8 @@ except Exception:
     pass
 
 # ----- Blueprints -----
-from dashboard.api import auth_bp, targets_bp, traps_bp, campaigns_bp, intel_bp, track_bp, jobs_bp
+from dashboard.api import auth_bp, campaigns_bp, intel_bp, jobs_bp, targets_bp, track_bp, traps_bp
+
 app.register_blueprint(auth_bp)
 app.register_blueprint(targets_bp)
 app.register_blueprint(traps_bp)

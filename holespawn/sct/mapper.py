@@ -20,7 +20,6 @@ Seithar Cognitive Defense Taxonomy:
 """
 
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -139,7 +138,7 @@ class SCTVulnerabilityMap:
 class SCTMapper:
     """
     Maps behavioral profile data to SCT vulnerability scores.
-    
+
     Input: behavioral_matrix dict from holespawn.profile.analyzer
     Output: SCTVulnerabilityMap with scores 0.0-1.0 for each SCT code
     """
@@ -167,7 +166,7 @@ class SCTMapper:
     def map(self, behavioral_matrix: dict[str, Any]) -> SCTVulnerabilityMap:
         """
         Compute SCT vulnerability scores from a behavioral matrix.
-        
+
         behavioral_matrix expected keys:
           - themes: list of (theme, count) tuples
           - sentiment: dict with compound, pos, neg, neu

@@ -2,9 +2,9 @@
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, desc, func
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from .models import (
@@ -20,7 +20,7 @@ from .models import (
 )
 
 
-def _json_load(s: Optional[str]) -> Any:
+def _json_load(s: str | None) -> Any:
     if s is None:
         return None
     try:
@@ -29,7 +29,7 @@ def _json_load(s: Optional[str]) -> Any:
         return None
 
 
-def _json_dump(v: Any) -> Optional[str]:
+def _json_dump(v: Any) -> str | None:
     if v is None:
         return None
     return json.dumps(v) if not isinstance(v, str) else v
@@ -39,10 +39,10 @@ def _json_dump(v: Any) -> Optional[str]:
 def create_target(
     db: Session,
     identifier: str,
-    platform: Optional[str] = None,
+    platform: str | None = None,
     priority: int = 0,
-    tags: Optional[List[str]] = None,
-    notes: Optional[str] = None,
+    tags: list[str] | None = None,
+    notes: str | None = None,
 ) -> Target:
     t = Target(
         identifier=identifier,
@@ -57,22 +57,22 @@ def create_target(
     return t
 
 
-def get_target(db: Session, target_id: int) -> Optional[Target]:
+def get_target(db: Session, target_id: int) -> Target | None:
     return db.query(Target).filter(Target.id == target_id).first()
 
 
-def get_target_by_identifier(db: Session, identifier: str) -> Optional[Target]:
+def get_target_by_identifier(db: Session, identifier: str) -> Target | None:
     return db.query(Target).filter(Target.identifier == identifier).first()
 
 
 def list_targets(
     db: Session,
-    status: Optional[str] = None,
-    platform: Optional[str] = None,
-    tags_contains: Optional[str] = None,
+    status: str | None = None,
+    platform: str | None = None,
+    tags_contains: str | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> List[Target]:
+) -> list[Target]:
     q = db.query(Target)
     if status:
         q = q.filter(Target.status == status)
@@ -87,7 +87,7 @@ def update_target(
     db: Session,
     target_id: int,
     **kwargs: Any,
-) -> Optional[Target]:
+) -> Target | None:
     t = get_target(db, target_id)
     if not t:
         return None
@@ -114,12 +114,12 @@ def delete_target(db: Session, target_id: int) -> bool:
 def create_trap(
     db: Session,
     target_id: int,
-    url: Optional[str] = None,
-    local_path: Optional[str] = None,
-    deployment_method: Optional[str] = None,
-    architecture: Optional[str] = None,
-    design_system: Optional[Dict] = None,
-    campaign_id: Optional[int] = None,
+    url: str | None = None,
+    local_path: str | None = None,
+    deployment_method: str | None = None,
+    architecture: str | None = None,
+    design_system: dict | None = None,
+    campaign_id: int | None = None,
 ) -> Trap:
     trap = Trap(
         target_id=target_id,
@@ -136,22 +136,22 @@ def create_trap(
     return trap
 
 
-def get_trap(db: Session, trap_id: int) -> Optional[Trap]:
+def get_trap(db: Session, trap_id: int) -> Trap | None:
     return db.query(Trap).filter(Trap.id == trap_id).first()
 
 
-def get_trap_by_url(db: Session, url: str) -> Optional[Trap]:
+def get_trap_by_url(db: Session, url: str) -> Trap | None:
     return db.query(Trap).filter(Trap.url == url).first()
 
 
 def list_traps(
     db: Session,
-    target_id: Optional[int] = None,
-    campaign_id: Optional[int] = None,
-    is_active: Optional[bool] = None,
+    target_id: int | None = None,
+    campaign_id: int | None = None,
+    is_active: bool | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> List[Trap]:
+) -> list[Trap]:
     q = db.query(Trap)
     if target_id is not None:
         q = q.filter(Trap.target_id == target_id)
@@ -162,7 +162,7 @@ def list_traps(
     return q.order_by(desc(Trap.created_at)).offset(offset).limit(limit).all()
 
 
-def update_trap(db: Session, trap_id: int, **kwargs: Any) -> Optional[Trap]:
+def update_trap(db: Session, trap_id: int, **kwargs: Any) -> Trap | None:
     t = get_trap(db, trap_id)
     if not t:
         return None
@@ -181,11 +181,11 @@ def create_visit(
     db: Session,
     trap_id: int,
     target_id: int,
-    session_id: Optional[str] = None,
-    visitor_fingerprint: Optional[str] = None,
-    entry_page: Optional[str] = None,
-    referrer: Optional[str] = None,
-    utm_params: Optional[Dict] = None,
+    session_id: str | None = None,
+    visitor_fingerprint: str | None = None,
+    entry_page: str | None = None,
+    referrer: str | None = None,
+    utm_params: dict | None = None,
 ) -> Visit:
     v = Visit(
         trap_id=trap_id,
@@ -204,17 +204,17 @@ def create_visit(
 
 def update_visit_end(
     db: Session,
-    visit_id: Optional[int] = None,
-    session_id: Optional[str] = None,
-    trap_id: Optional[int] = None,
-    duration: Optional[float] = None,
-    exit_page: Optional[str] = None,
-    pages_visited: Optional[List[str]] = None,
-    depth: Optional[int] = None,
-    scroll_depth: Optional[Dict] = None,
-    clicks: Optional[Dict] = None,
-    time_per_page: Optional[Dict] = None,
-) -> Optional[Visit]:
+    visit_id: int | None = None,
+    session_id: str | None = None,
+    trap_id: int | None = None,
+    duration: float | None = None,
+    exit_page: str | None = None,
+    pages_visited: list[str] | None = None,
+    depth: int | None = None,
+    scroll_depth: dict | None = None,
+    clicks: dict | None = None,
+    time_per_page: dict | None = None,
+) -> Visit | None:
     q = db.query(Visit)
     if visit_id:
         q = q.filter(Visit.id == visit_id)
@@ -245,7 +245,7 @@ def update_visit_end(
     return v
 
 
-def get_visits_for_trap(db: Session, trap_id: int, limit: int = 100) -> List[Visit]:
+def get_visits_for_trap(db: Session, trap_id: int, limit: int = 100) -> list[Visit]:
     return db.query(Visit).filter(Visit.trap_id == trap_id).order_by(desc(Visit.started_at)).limit(limit).all()
 
 
@@ -253,11 +253,11 @@ def get_visits_for_trap(db: Session, trap_id: int, limit: int = 100) -> List[Vis
 def create_campaign(
     db: Session,
     name: str,
-    description: Optional[str] = None,
-    goal: Optional[str] = None,
-    target_network: Optional[str] = None,
-    campaign_type: Optional[str] = None,
-    orchestration_plan: Optional[Dict] = None,
+    description: str | None = None,
+    goal: str | None = None,
+    target_network: str | None = None,
+    campaign_type: str | None = None,
+    orchestration_plan: dict | None = None,
 ) -> Campaign:
     c = Campaign(
         name=name,
@@ -273,11 +273,11 @@ def create_campaign(
     return c
 
 
-def get_campaign(db: Session, campaign_id: int) -> Optional[Campaign]:
+def get_campaign(db: Session, campaign_id: int) -> Campaign | None:
     return db.query(Campaign).filter(Campaign.id == campaign_id).first()
 
 
-def list_campaigns(db: Session, status: Optional[str] = None, limit: int = 50) -> List[Campaign]:
+def list_campaigns(db: Session, status: str | None = None, limit: int = 50) -> list[Campaign]:
     q = db.query(Campaign)
     if status:
         q = q.filter(Campaign.status == status)
@@ -289,9 +289,9 @@ def add_target_to_campaign(
     campaign_id: int,
     target_id: int,
     phase: int = 0,
-    scheduled_deploy: Optional[datetime] = None,
-    custom_messaging: Optional[Dict] = None,
-) -> Optional[CampaignTarget]:
+    scheduled_deploy: datetime | None = None,
+    custom_messaging: dict | None = None,
+) -> CampaignTarget | None:
     c = get_campaign(db, campaign_id)
     if not c:
         return None
@@ -328,12 +328,12 @@ def remove_target_from_campaign(db: Session, campaign_id: int, target_id: int) -
 def create_network(
     db: Session,
     name: str,
-    nodes: Optional[List] = None,
-    edges: Optional[List] = None,
-    platform: Optional[str] = None,
-    communities: Optional[Dict] = None,
-    central_nodes: Optional[List] = None,
-    influence_map: Optional[Dict] = None,
+    nodes: list | None = None,
+    edges: list | None = None,
+    platform: str | None = None,
+    communities: dict | None = None,
+    central_nodes: list | None = None,
+    influence_map: dict | None = None,
 ) -> Network:
     n = Network(
         name=name,
@@ -352,11 +352,11 @@ def create_network(
     return n
 
 
-def get_network(db: Session, network_id: int) -> Optional[Network]:
+def get_network(db: Session, network_id: int) -> Network | None:
     return db.query(Network).filter(Network.id == network_id).first()
 
 
-def list_networks(db: Session, limit: int = 50) -> List[Network]:
+def list_networks(db: Session, limit: int = 50) -> list[Network]:
     return db.query(Network).order_by(desc(Network.scraped_at)).limit(limit).all()
 
 
@@ -364,8 +364,8 @@ def list_networks(db: Session, limit: int = 50) -> List[Network]:
 def create_job(
     db: Session,
     job_type: str,
-    target_id: Optional[int] = None,
-    params: Optional[Dict] = None,
+    target_id: int | None = None,
+    params: dict | None = None,
     priority: int = 0,
 ) -> Job:
     j = Job(job_type=job_type, target_id=target_id, params=_json_dump(params), priority=priority)
@@ -375,16 +375,16 @@ def create_job(
     return j
 
 
-def get_job(db: Session, job_id: int) -> Optional[Job]:
+def get_job(db: Session, job_id: int) -> Job | None:
     return db.query(Job).filter(Job.id == job_id).first()
 
 
 def list_jobs(
     db: Session,
-    status: Optional[str] = None,
-    job_type: Optional[str] = None,
+    status: str | None = None,
+    job_type: str | None = None,
     limit: int = 50,
-) -> List[Job]:
+) -> list[Job]:
     q = db.query(Job)
     if status:
         q = q.filter(Job.status == status)
@@ -396,13 +396,13 @@ def list_jobs(
 def update_job(
     db: Session,
     job_id: int,
-    status: Optional[str] = None,
-    progress: Optional[float] = None,
-    result: Optional[Dict] = None,
-    error: Optional[str] = None,
-    started_at: Optional[datetime] = None,
-    completed_at: Optional[datetime] = None,
-) -> Optional[Job]:
+    status: str | None = None,
+    progress: float | None = None,
+    result: dict | None = None,
+    error: str | None = None,
+    started_at: datetime | None = None,
+    completed_at: datetime | None = None,
+) -> Job | None:
     j = get_job(db, job_id)
     if not j:
         return None
@@ -424,7 +424,7 @@ def update_job(
 
 
 # ---- Audit ----
-def audit_log(db: Session, session_id: Optional[str], operation: str, target_id: Optional[int] = None, details: Optional[Dict] = None) -> AuditLog:
+def audit_log(db: Session, session_id: str | None, operation: str, target_id: int | None = None, details: dict | None = None) -> AuditLog:
     a = AuditLog(
         session_id=session_id,
         operation=operation,
@@ -443,10 +443,10 @@ def create_engagement(
     target_id: int,
     platform: str,
     engagement_type: str,
-    message_content: Optional[str] = None,
-    reference_id: Optional[str] = None,
+    message_content: str | None = None,
+    reference_id: str | None = None,
     included_trap: bool = False,
-    framing_strategy: Optional[str] = None,
+    framing_strategy: str | None = None,
 ) -> Engagement:
     e = Engagement(
         target_id=target_id,
@@ -463,7 +463,7 @@ def create_engagement(
     return e
 
 
-def get_engagement(db: Session, engagement_id: int) -> Optional[Engagement]:
+def get_engagement(db: Session, engagement_id: int) -> Engagement | None:
     return db.query(Engagement).filter(Engagement.id == engagement_id).first()
 
 
@@ -471,7 +471,7 @@ def list_engagements_for_target(
     db: Session,
     target_id: int,
     limit: int = 100,
-) -> List[Engagement]:
+) -> list[Engagement]:
     return (
         db.query(Engagement)
         .filter(Engagement.target_id == target_id)
@@ -485,7 +485,7 @@ def update_engagement(
     db: Session,
     engagement_id: int,
     **kwargs: Any,
-) -> Optional[Engagement]:
+) -> Engagement | None:
     e = get_engagement(db, engagement_id)
     if not e:
         return None
