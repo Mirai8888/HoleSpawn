@@ -148,12 +148,19 @@ def _trace_from_seed(
 ) -> None:
     """Recursively trace amplification from a seed outward."""
     if len(path) >= max_depth:
+        if path:
+            results.append(AmplificationChain(
+                origin=path[0],
+                chain=list(reversed(path + [node])),
+                edge_types=list(reversed(edge_types)),
+                depth=len(path),
+            ))
         return
 
-    preds = list(G.predecessors(node))
+    preds = [p for p in G.predecessors(node) if p not in path]
     if not preds and path:
         results.append(AmplificationChain(
-            origin=path[0] if path else node,
+            origin=path[0],
             chain=list(reversed(path + [node])),
             edge_types=list(reversed(edge_types)),
             depth=len(path),
@@ -161,20 +168,10 @@ def _trace_from_seed(
         return
 
     for pred in preds:
-        if pred in path:
-            continue  # avoid cycles
         data = G[pred][node]
         types = data.get("types", set())
         etype = "quote_tweet" if "quote_tweet" in types else "retweet"
         _trace_from_seed(G, pred, path + [node], edge_types + [etype], max_depth, results)
-
-    if path:
-        results.append(AmplificationChain(
-            origin=path[0],
-            chain=list(reversed(path + [node])),
-            edge_types=list(reversed(edge_types)),
-            depth=len(path),
-        ))
 
 
 def analyze_bridges(G: nx.DiGraph) -> list[dict[str, Any]]:

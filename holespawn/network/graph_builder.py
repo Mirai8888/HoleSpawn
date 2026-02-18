@@ -8,6 +8,7 @@ Returns NetworkX DiGraphs with typed, weighted, timestamped edges.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -184,12 +185,14 @@ def build_graph(
     )
 
 
+_RE_RT_PREFIX = re.compile(r"^RT @\w+:\s*")
+_RE_MENTION = re.compile(r"@(\w+)")
+
+
 def _extract_mentions(text: str) -> list[str]:
     """Extract @mentions from tweet text, excluding RT prefix."""
-    import re
-    # Skip "RT @user:" prefix
-    clean = re.sub(r"^RT @\w+:\s*", "", text)
-    return re.findall(r"@(\w+)", clean)
+    clean = _RE_RT_PREFIX.sub("", text)
+    return _RE_MENTION.findall(clean)
 
 
 def filter_graph_by_time(
