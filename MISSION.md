@@ -7,6 +7,40 @@
 
 Cognitive substrate profiling platform. Ingest social media output → construct psychological profiles → map vulnerability surfaces → generate personalized engagement architectures. Network analysis maps communities, bridge nodes, and key-node profiles.
 
+## Architecture
+
+### Seithar Unified Pipeline (`seithar/`)
+
+The `seithar` package is the orchestration layer wrapping all Seithar ecosystem repos into a single importable pipeline:
+
+```
+Profile → Scan → Plan → Arm → Deploy → Measure → Evolve
+```
+
+```python
+from seithar import SeitharPipeline
+pipeline = SeitharPipeline()
+results = pipeline.run("target_handle")
+```
+
+**Package structure:**
+- `seithar/__init__.py` — Entry point, exports `SeitharPipeline`
+- `seithar/pipeline.py` — `SeitharPipeline` orchestrator class
+- `seithar/taxonomy.py` — **Single source of truth** for SCT-001 through SCT-012 (dataclass-based)
+- `seithar/stages/profile.py` — Wraps holespawn.scraper, network, profile
+- `seithar/stages/scan.py` — Wraps seithar-cogdef scanner (local patterns + LLM)
+- `seithar/stages/plan.py` — Wraps ThreadMap chain modeling
+- `seithar/stages/arm.py` — Payload generation via holespawn.generator
+- `seithar/stages/deploy.py` — Delivery via holespawn.delivery + moltbook
+- `seithar/stages/measure.py` — Wraps influence_flow + temporal analysis
+- `seithar/stages/evolve.py` — Feedback loop, taxonomy weight updates
+
+**Design principles:**
+- `seithar/` wraps existing modules — does not move or break them
+- `holespawn/` continues to work independently
+- External repos (cogdef, ThreadMap, autoprompt) imported when available, graceful fallback otherwise
+- Each stage returns a typed dataclass; pipeline captures errors without halting
+
 ## Current State
 
 ### Working
@@ -52,3 +86,6 @@ Python 3.9+, Anthropic API, VADER/NLTK, NetworkX, Playwright, SQLite. Rust toolc
 | 2026-02-18 | Dual-substrate upgrade: SCT-008/009 physical substrate techniques integrated |
 | 2026-02-18 | Taxonomy v2.0 propagated across all Seithar repos |
 | 2026-02-18 | Cross-repo shared config and monitoring hooks added to ecosystem |
+| 2026-02-19 | Seithar unified pipeline package created (seithar/) — 7-stage orchestration layer |
+| 2026-02-19 | Canonical SCT taxonomy as dataclasses in seithar/taxonomy.py (single source of truth) |
+| 2026-02-19 | 18 pipeline tests passing (tests/test_pipeline.py) |
