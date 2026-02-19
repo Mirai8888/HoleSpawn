@@ -14,6 +14,7 @@ from .graph_analysis import (
 )
 
 # v3 analytical engine modules
+from .community_archive import CommunityArchiveSource, ConversationTree, QuoteChain
 from .graph_builder import GraphSpec, build_graph, filter_graph_by_time
 from .influence_flow import InfluenceReport, analyze_influence_flow
 from .node_profiler import NodeProfile, profile_key_nodes
@@ -32,6 +33,10 @@ __all__ = [
     "NodeProfile",
     "profile_key_nodes",
     "run_network_graph_pipeline",
+    # Community Archive integration
+    "CommunityArchiveSource",
+    "ConversationTree",
+    "QuoteChain",
     # v3 analytical engine
     "GraphSpec",
     "build_graph",

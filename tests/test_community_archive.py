@@ -163,6 +163,151 @@ class TestExtractContent:
         assert profiles["testuser"].tweet_count == 3
 
 
+class TestNetworkAdapter:
+    """Tests for the network-layer CommunityArchiveSource."""
+
+    def test_build_social_graph(self):
+        from holespawn.network.community_archive import CommunityArchiveSource
+
+        client = _make_mock_client()
+        source = CommunityArchiveSource(client=client)
+
+        # Pre-populate cache to avoid real API calls
+        source._cache["testuser"] = {
+            "tweets": MOCK_TWEETS,
+            "followers": MOCK_FOLLOWERS,
+            "following": MOCK_FOLLOWING,
+            "mentions": MOCK_MENTIONS,
+            "quote_tweets": MOCK_QUOTE_TWEETS,
+            "retweets": MOCK_RETWEETS,
+        }
+
+        graph = source.build_social_graph(["testuser"])
+        assert graph.node_count > 0
+        assert graph.edge_count > 0
+
+    def test_fetch_follow_graph(self):
+        from holespawn.network.community_archive import CommunityArchiveSource
+
+        client = _make_mock_client()
+        source = CommunityArchiveSource(client=client)
+
+        source._cache["testuser"] = {
+            "tweets": [],
+            "followers": MOCK_FOLLOWERS,
+            "following": MOCK_FOLLOWING,
+            "mentions": [],
+            "quote_tweets": [],
+            "retweets": [],
+        }
+
+        graph = source.fetch_follow_graph(["testuser"])
+        # Should have follow edges only
+        assert graph.node_count > 0
+        for u, v, data in graph.graph.edges(data=True):
+            assert "follow" in data.get("types", set())
+
+    def test_fetch_account_tweets(self):
+        from holespawn.network.community_archive import CommunityArchiveSource
+
+        client = _make_mock_client()
+        source = CommunityArchiveSource(client=client)
+
+        source._cache["testuser"] = {
+            "tweets": MOCK_TWEETS,
+            "followers": [],
+            "following": [],
+            "mentions": [],
+            "quote_tweets": MOCK_QUOTE_TWEETS,
+            "retweets": MOCK_RETWEETS,
+        }
+
+        tweets = source.fetch_account_tweets("testuser")
+        assert len(tweets) > 0
+        assert all(t.get("author") == "testuser" for t in tweets)
+
+    def test_build_content_corpus(self):
+        from holespawn.network.community_archive import CommunityArchiveSource
+
+        client = _make_mock_client()
+        source = CommunityArchiveSource(client=client)
+
+        source._cache["testuser"] = {"tweets": MOCK_TWEETS}
+
+        corpus = source.build_content_corpus(["testuser"])
+        assert len(corpus) == 3
+        assert all(t["author"] == "testuser" for t in corpus)
+
+
+class TestConversationTree:
+    """Tests for conversation tree reconstruction (memetic-lineage technique)."""
+
+    def test_build_tree(self):
+        from holespawn.network.community_archive import _build_conversation_tree
+
+        tweets = [
+            {"tweet_id": "100", "account_id": "a1", "username": "alice",
+             "reply_to_tweet_id": None, "created_at": "2024-01-01T10:00:00Z"},
+            {"tweet_id": "101", "account_id": "a2", "username": "bob",
+             "reply_to_tweet_id": "100", "created_at": "2024-01-01T11:00:00Z"},
+            {"tweet_id": "102", "account_id": "a3", "username": "charlie",
+             "reply_to_tweet_id": "101", "created_at": "2024-01-01T12:00:00Z"},
+            {"tweet_id": "103", "account_id": "a1", "username": "alice",
+             "reply_to_tweet_id": "100", "created_at": "2024-01-01T12:30:00Z"},
+        ]
+        tree = _build_conversation_tree(tweets, "100")
+        assert tree.root_tweet_id == "100"
+        assert tree.root_author == "alice"
+        assert tree.depth == 2  # 100 -> 101 -> 102
+        assert tree.participant_count == 3
+        assert "100" in tree.children_map
+        assert len(tree.children_map["100"]) == 2  # 101 and 103
+
+    def test_empty_tree(self):
+        from holespawn.network.community_archive import _build_conversation_tree
+
+        tree = _build_conversation_tree([], "999")
+        assert tree.depth == 0
+        assert tree.participant_count == 0
+
+
+class TestSelfQuoteFiltering:
+    """Tests for self-amplification filtering in influence_flow (memetic-lineage adoption)."""
+
+    def test_self_rt_excluded_from_seeds(self):
+        import networkx as nx
+        from holespawn.network.influence_flow import detect_narrative_seeds
+
+        G = nx.DiGraph()
+        # Self-retweet edge (should be excluded)
+        G.add_edge("alice", "alice", weight=4.0, types={"retweet"})
+        # Real amplification
+        G.add_edge("bob", "alice", weight=4.0, types={"quote_tweet"})
+
+        seeds = detect_narrative_seeds(G)
+        alice_seed = next((s for s in seeds if s.user == "alice"), None)
+        assert alice_seed is not None
+        # Only bob's amplification should count, not alice's self-RT
+        assert alice_seed.total_amplification == 4
+        assert "bob" in alice_seed.top_amplifiers
+        assert "alice" not in alice_seed.top_amplifiers
+
+    def test_self_qt_excluded_from_scores(self):
+        import networkx as nx
+        from holespawn.network.influence_flow import compute_influence_scores
+
+        G = nx.DiGraph()
+        G.add_edge("alice", "alice", weight=4.0, types={"quote_tweet"})
+        G.add_edge("bob", "alice", weight=3.0, types={"retweet"})
+        G.add_edge("charlie", "bob", weight=2.0, types={"quote_tweet"})
+
+        scores, breakdown = compute_influence_scores(G)
+        # alice's self-QT should not inflate her seeding score
+        assert breakdown["alice"]["seeding"] > 0  # bob's RT counted
+        # bob should have seeding from charlie
+        assert breakdown["bob"]["seeding"] > 0
+
+
 class TestPagination:
     def test_pagination_stops_on_empty(self):
         client = CommunityArchiveClient.__new__(CommunityArchiveClient)

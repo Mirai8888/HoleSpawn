@@ -61,6 +61,8 @@ results = pipeline.run("target_handle")
 - Scraper integration: convenience `from_twitter(username)` function
 - Delivery channel integration, CLI `--sct` flag
 
+- Community Archive integration: CommunityArchiveSource adapter ingests 17M+ tweets from community-archive.org Supabase API into graph_builder format. Self-quote filtering in influence_flow adopted from memetic-lineage. Conversation tree reconstruction with O(1) adjacency maps.
+
 ### Queued
 1. Live delivery channels (Twitter DM, Discord, email)
 2. Cohort delivery (inner-circle aggregate engagement)
@@ -89,3 +91,4 @@ Python 3.9+, Anthropic API, VADER/NLTK, NetworkX, Playwright, SQLite. Rust toolc
 | 2026-02-19 | Seithar unified pipeline package created (seithar/) — 7-stage orchestration layer |
 | 2026-02-19 | Canonical SCT taxonomy as dataclasses in seithar/taxonomy.py (single source of truth) |
 | 2026-02-19 | 18 pipeline tests passing (tests/test_pipeline.py) |
+| 2026-02-19 | Community Archive adapter: CommunityArchiveSource in network/, self-quote filtering in influence_flow, conversation tree reconstruction |

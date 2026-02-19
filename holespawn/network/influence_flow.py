@@ -86,6 +86,11 @@ def detect_narrative_seeds(G: nx.DiGraph) -> list[NarrativeSeed]:
         types = data.get("types", set())
         if types & {"retweet", "quote_tweet"}:
             # u amplifies v's content
+            # Filter self-amplification: skip edges where a user quotes/RTs
+            # themselves. Adopted from memetic-lineage's count_quotes()
+            # which excludes self-QTs to avoid inflating seed scores.
+            if u == v:
+                continue
             sd = seed_data[v]
             sd["count"] += 1
             sd["amplification"] += int(data.get("weight", 1))
@@ -248,12 +253,15 @@ def compute_influence_scores(G: nx.DiGraph) -> tuple[dict[str, float], dict[str,
     W_REACH = 0.25
 
     # Seeding score: how much incoming RT/QT traffic
+    # Self-amplification filtered (memetic-lineage technique)
     seed_scores: dict[str, float] = defaultdict(float)
     amp_scores: dict[str, float] = defaultdict(float)
     for u, v, data in G.edges(data=True):
         types = data.get("types", set())
         w = data.get("weight", 1)
         if types & {"retweet", "quote_tweet"}:
+            if u == v:
+                continue
             seed_scores[v] += w
             amp_scores[u] += w
 
