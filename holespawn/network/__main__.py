@@ -31,6 +31,7 @@ except ImportError:
 from .analyzer import NetworkAnalyzer, load_edges_file, load_profiles_from_dir
 from .apify_network import fetch_profiles_via_apify
 from .brief import get_network_engagement_brief
+from .engine import NetworkEngine
 from .pipeline import run_network_graph_pipeline
 
 
@@ -41,10 +42,171 @@ def _looks_like_username(s: str) -> bool:
     return bool(s) and not Path(s).exists() and "/" not in s and "\\" not in s and "." not in s
 
 
+def _run_engine(args: argparse.Namespace) -> None:
+    """Run the operational network engine CLI."""
+    import networkx as nx
+    from .graph_builder import build_graph
+
+    graph_path = Path(args.graph)
+    if not graph_path.exists():
+        sys.stderr.write(f"[engine] error: graph file not found: {graph_path}\n")
+        sys.exit(1)
+
+    data = json.loads(graph_path.read_text())
+
+    # Accept multiple formats: raw edge list, graph_builder output, or nx node_link
+    G: nx.DiGraph | None = None
+    if "links" in data and "nodes" in data:
+        # node_link_data format
+        G = nx.node_link_graph(data, directed=True)
+    elif "edges" in data:
+        # Our edge list format: [{source, target, weight?, types?}, ...]
+        G = nx.DiGraph()
+        for e in data["edges"]:
+            src = e.get("source") or e.get("from")
+            tgt = e.get("target") or e.get("to")
+            if src and tgt:
+                G.add_edge(
+                    src, tgt,
+                    weight=e.get("weight", 1.0),
+                    types=set(e.get("types", [])),
+                )
+    elif isinstance(data, list):
+        # Plain edge list: [{source, target, ...}, ...]
+        G = nx.DiGraph()
+        for e in data:
+            src = e.get("source") or e.get("from")
+            tgt = e.get("target") or e.get("to")
+            if src and tgt:
+                G.add_edge(
+                    src, tgt,
+                    weight=e.get("weight", 1.0),
+                    types=set(e.get("types", [])),
+                )
+    else:
+        sys.stderr.write(
+            "[engine] error: unrecognized graph format. Expected node_link, {edges: [...]}, or [{source, target}, ...]\n"
+        )
+        sys.exit(1)
+
+    if G is None or G.number_of_nodes() == 0:
+        sys.stderr.write("[engine] error: graph is empty\n")
+        sys.exit(1)
+
+    sys.stderr.write(f"[engine] Loaded graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges\n")
+
+    engine = NetworkEngine(G)
+    out_dir = Path(args.output) if args.output else Path(".")
+
+    if args.command == "analyze":
+        intel = engine.analyze()
+        out_path = out_dir / "network_intel.json"
+        engine.export_intel(out_path)
+        sys.stderr.write(f"[engine] Intel exported: {out_path}\n")
+        sys.stderr.write(f"  Communities: {intel.community_count}\n")
+        sys.stderr.write(f"  Hubs: {len(intel.hubs)} | Bridges: {len(intel.bridges)} | SPOFs: {len(intel.spofs)}\n")
+
+        # Print top 10 by influence
+        top = intel.top_nodes(by="influence_score", n=10)
+        sys.stderr.write("  Top 10 by influence:\n")
+        for op in top:
+            sys.stderr.write(f"    {op.node:20s}  {op.role:12s}  score={op.influence_score:.4f}  pr={op.pagerank:.6f}\n")
+
+    elif args.command == "paths":
+        if not args.source or not args.target_node:
+            sys.stderr.write("[engine] error: --source and --target required for paths\n")
+            sys.exit(1)
+        paths = engine.find_influence_paths(args.source, args.target_node, k=args.top_k)
+        if not paths:
+            sys.stderr.write(f"[engine] No paths found from {args.source} to {args.target_node}\n")
+            return
+        for i, p in enumerate(paths):
+            sys.stderr.write(
+                f"  Path {i+1}: {' -> '.join(p.path)}  "
+                f"(hops={p.hops}, reliability={p.reliability:.4f}, "
+                f"bottleneck={p.bottleneck_edge})\n"
+            )
+        out_path = out_dir / "influence_paths.json"
+        out_path.write_text(json.dumps([p.to_dict() for p in paths], indent=2))
+        sys.stderr.write(f"[engine] Paths exported: {out_path}\n")
+
+    elif args.command == "plan":
+        target_nodes = args.target_nodes.split(",") if args.target_nodes else None
+        target_comm = args.target_community
+        entry = args.entry.split(",") if args.entry else None
+
+        plan = engine.plan_operation(
+            objective=args.objective or "reach",
+            target_nodes=target_nodes,
+            target_community=target_comm,
+            entry_nodes=entry,
+        )
+        out_path = out_dir / "operation_plan.json"
+        engine.export_plan(plan, out_path)
+        sys.stderr.write(f"[engine] Plan exported: {out_path}\n")
+        sys.stderr.write(f"  Objective: {plan.objective}\n")
+        sys.stderr.write(f"  Entry points: {len(plan.entry_points)}\n")
+        sys.stderr.write(f"  Paths: {len(plan.paths)}\n")
+        sys.stderr.write(f"  Amplifiers: {len(plan.amplification_chain)}\n")
+        sys.stderr.write(f"  Weak links: {len(plan.weak_links)}\n")
+        sys.stderr.write(f"  Estimated reach: {plan.estimated_reach_pct:.1%}\n")
+
+    elif args.command == "compare":
+        if not args.graph_b:
+            sys.stderr.write("[engine] error: --graph-b required for compare\n")
+            sys.exit(1)
+        data_b = json.loads(Path(args.graph_b).read_text())
+        if "links" in data_b and "nodes" in data_b:
+            G_b = nx.node_link_graph(data_b, directed=True)
+        elif "edges" in data_b:
+            G_b = nx.DiGraph()
+            for e in data_b["edges"]:
+                src = e.get("source") or e.get("from")
+                tgt = e.get("target") or e.get("to")
+                if src and tgt:
+                    G_b.add_edge(src, tgt, weight=e.get("weight", 1.0), types=set(e.get("types", [])))
+        else:
+            sys.stderr.write("[engine] error: unrecognized format for --graph-b\n")
+            sys.exit(1)
+
+        engine_b = NetworkEngine(G_b)
+        diff = engine.compare(engine_b)
+        out_path = out_dir / "network_diff.json"
+        out_path.write_text(json.dumps(diff, indent=2, default=str))
+        sys.stderr.write(f"[engine] Diff exported: {out_path}\n")
+        sys.stderr.write(f"  Nodes: {diff['node_count_delta']:+d} | Edges: {diff['edge_count_delta']:+d}\n")
+        sys.stderr.write(f"  New: {len(diff['new_nodes'])} | Lost: {len(diff['lost_nodes'])} | Role changes: {len(diff['role_changes'])}\n")
+
+    else:
+        sys.stderr.write(f"[engine] Unknown command: {args.command}\n")
+        sys.exit(1)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Network analysis: graph profiling (@username) or file-based / live-scraped profiles (dir / --apify)."
+        description="Network analysis: graph profiling (@username), file-based profiles, or operational engine."
     )
+    subparsers = parser.add_subparsers(dest="mode")
+
+    # Engine subcommand
+    eng = subparsers.add_parser("engine", help="Operational network engine")
+    eng.add_argument("command", choices=["analyze", "paths", "plan", "compare"],
+                     help="Engine command: analyze|paths|plan|compare")
+    eng.add_argument("--graph", required=True, help="Path to graph JSON (node_link or edge list)")
+    eng.add_argument("-o", "--output", help="Output directory (default: current)")
+    # paths args
+    eng.add_argument("--source", help="Source node for paths command")
+    eng.add_argument("--target-node", help="Target node for paths command")
+    eng.add_argument("--top-k", type=int, default=5, help="Number of paths to find (default: 5)")
+    # plan args
+    eng.add_argument("--objective", default="reach", help="Operation objective: reach|disrupt|monitor")
+    eng.add_argument("--target-nodes", help="Comma-separated target nodes")
+    eng.add_argument("--target-community", type=int, default=None, help="Target community ID")
+    eng.add_argument("--entry", help="Comma-separated entry nodes")
+    # compare args
+    eng.add_argument("--graph-b", help="Second graph for compare command")
+
+    # Legacy positional mode
     parser.add_argument(
         "positional",
         nargs="?",
@@ -149,6 +311,11 @@ def main() -> None:
         help="Skip confirmation for large --apify runs.",
     )
     args = parser.parse_args()
+
+    # Engine mode
+    if args.mode == "engine":
+        _run_engine(args)
+        return
 
     # Graph profiling mode: positional is username and -o is directory (not a .json file)
     if (

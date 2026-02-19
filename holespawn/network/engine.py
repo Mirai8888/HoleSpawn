@@ -793,12 +793,16 @@ class NetworkEngine:
         """Export full network intelligence to JSON."""
         intel = self.analyze()
         data = intel.to_dict()
-        Path(path).write_text(json.dumps(data, indent=2, default=str))
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(data, indent=2, default=str))
         logger.info("Exported network intel to %s", path)
 
     def export_plan(self, plan: OperationPlan, path: str | Path) -> None:
         """Export an operation plan to JSON."""
-        Path(path).write_text(
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(
             json.dumps(plan.to_dict(), indent=2, default=str)
         )
         logger.info("Exported operation plan to %s", path)
