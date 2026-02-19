@@ -1,7 +1,7 @@
 # MISSION.md — HoleSpawn (穴卵)
 
 **Status:** Operational  
-**Last Updated:** 2026-02-11
+**Last Updated:** 2026-02-19
 
 ## Purpose
 
@@ -48,6 +48,7 @@ results = pipeline.run("target_handle")
 - SCT integration: algorithmic SCT-001 through SCT-012 vulnerability mapping (`holespawn.sct`)
 - Network analysis v2: community detection, bridge identification, node profiling
 - Network analytical engine v3: graph_builder (weighted/temporal digraphs), influence_flow (seeding/amplification/bridges/composite scores), vulnerability (fragmentation/SPOFs/cohesion/attack surfaces), temporal (snapshot diff/community evolution/trends), content_overlay (topic mapping/belief clustering/narrative divergence/sentiment flow)
+- Network operational engine v4: NetworkEngine orchestration (OperationalNode profiles with role classification, influence path finding with bottleneck detection, operation planning with amplification chains, gatekeeper detection, snapshot comparison). CLI: `python3 -m holespawn.network engine {analyze,paths,plan,compare}`
 - NLP pipeline: 200+ stopwords, 7 communication style categories, improved theme extraction
 - Delivery system v1: profile + binding protocol → LLM message → file/stdout
 - Recording daemon: scheduled Twitter snapshots into timestamped JSON + SQLite index
@@ -92,3 +93,6 @@ Python 3.9+, Anthropic API, VADER/NLTK, NetworkX, Playwright, SQLite. Rust toolc
 | 2026-02-19 | Canonical SCT taxonomy as dataclasses in seithar/taxonomy.py (single source of truth) |
 | 2026-02-19 | 18 pipeline tests passing (tests/test_pipeline.py) |
 | 2026-02-19 | Community Archive adapter: CommunityArchiveSource in network/, self-quote filtering in influence_flow, conversation tree reconstruction |
+| 2026-02-19 | NetworkEngine v4: operational orchestration layer — node profiling, influence paths, operation planning, snapshot diffing, gatekeeper detection |
+| 2026-02-19 | Engine CLI: `python3 -m holespawn.network engine {analyze,paths,plan,compare}` |
+| 2026-02-19 | 27 engine tests + all existing tests passing (197+ total) |
