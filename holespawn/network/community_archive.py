@@ -30,6 +30,7 @@ from holespawn.ingest.community_archive import (
     harvest_account,
     to_holespawn_graph,
 )
+import networkx as nx
 from holespawn.network.graph_builder import GraphSpec, build_graph
 
 logger = logging.getLogger(__name__)
@@ -140,6 +141,45 @@ class CommunityArchiveSource:
             followers=graph_input.get("followers"),
             edge_map=graph_input.get("edge_map"),
         )
+
+    def fetch_follow_graph_fast(
+        self, account_ids: list[str], follow_limit: int = 200
+    ) -> "nx.DiGraph":
+        """
+        Lightweight follow-only graph. Skips full harvest, queries follow
+        tables directly. Much faster for large seed sets.
+
+        Args:
+            account_ids: list of numeric account IDs (not usernames)
+            follow_limit: max follows/followers to fetch per account
+
+        Returns a raw NetworkX DiGraph (not GraphSpec).
+        """
+
+        G = nx.DiGraph()
+        aid_set = set(account_ids)
+
+        for aid in account_ids:
+            G.add_node(aid)
+            following = self.client._get(
+                "following",
+                {"account_id": f"eq.{aid}", "select": "following_account_id",
+                 "limit": str(follow_limit)},
+            )
+            for f in following:
+                target = str(f["following_account_id"])
+                G.add_edge(aid, target)
+
+            followers = self.client._get(
+                "followers",
+                {"account_id": f"eq.{aid}", "select": "follower_account_id",
+                 "limit": str(follow_limit)},
+            )
+            for f in followers:
+                source = str(f["follower_account_id"])
+                G.add_edge(source, aid)
+
+        return G
 
     def fetch_account_tweets(self, account_id: str) -> list[dict]:
         """
