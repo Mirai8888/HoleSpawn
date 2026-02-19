@@ -22,6 +22,9 @@ from .pipeline import run_network_graph_pipeline
 from .temporal import TemporalReport, analyze_temporal
 from .vulnerability import VulnerabilityReport, analyze_vulnerability
 
+# v4 operational engine
+from .engine import NetworkEngine, NetworkIntel, OperationalNode, OperationPlan, InfluencePath
+
 __all__ = [
     "NetworkAnalyzer",
     "load_profiles_from_dir",
@@ -49,4 +52,10 @@ __all__ = [
     "analyze_temporal",
     "ContentOverlayReport",
     "analyze_content_overlay",
+    # v4 operational engine
+    "NetworkEngine",
+    "NetworkIntel",
+    "OperationalNode",
+    "OperationPlan",
+    "InfluencePath",
 ]
