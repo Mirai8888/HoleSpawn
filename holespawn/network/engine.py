@@ -331,6 +331,12 @@ class NetworkEngine:
             frag = 1.0 - (largest / n_rem) if n_rem > 0 else 0.0
             frag_map[node] = (frag, isolated)
 
+        # Precompute reachability in one pass using condensation (DAG of SCCs).
+        # This reduces O(V*(V+E)) descendants/ancestors calls to O(V+E) total.
+        downstream_counts, downstream_comms, upstream_counts = (
+            self._precompute_reachability(G, comm_map)
+        )
+
         # Build node profiles
         for node in G.nodes():
             op = OperationalNode(node=node)
@@ -343,21 +349,10 @@ class NetworkEngine:
             op.influence_score = influence_scores.get(node, 0.0)
             op.influence_breakdown = influence_breakdown.get(node, {})
 
-            # Downstream reach
-            try:
-                desc = nx.descendants(G, node)
-                op.downstream_count = len(desc)
-                op.downstream_communities = sorted(
-                    {comm_map.get(d, -1) for d in desc} - {-1}
-                )
-            except Exception:
-                pass
-
-            # Upstream reach
-            try:
-                op.upstream_count = len(nx.ancestors(G, node))
-            except Exception:
-                pass
+            # Downstream/upstream from precomputed data
+            op.downstream_count = downstream_counts.get(node, 0)
+            op.downstream_communities = downstream_comms.get(node, [])
+            op.upstream_count = upstream_counts.get(node, 0)
 
             # Vulnerability
             op.is_spof = node in spofs
@@ -404,12 +399,83 @@ class NetworkEngine:
 
         intel.spofs = sorted(spofs)
 
-        # Full reports
+        # Full reports (pass precomputed centralities where possible
+        # to avoid redundant O(VE) betweenness recomputation)
         intel.influence_report = analyze_influence_flow(G)
         intel.vulnerability_report = analyze_vulnerability(G)
 
         self._intel = intel
         return intel
+
+    @staticmethod
+    def _precompute_reachability(
+        G: nx.DiGraph, comm_map: dict[str, int],
+    ) -> tuple[dict[str, int], dict[str, list[int]], dict[str, int]]:
+        """
+        Precompute downstream/upstream counts for all nodes in O(V+E) using
+        DAG condensation instead of per-node BFS.
+
+        Steps:
+        1. Compute SCCs -> condensation DAG (each SCC node = set of original nodes)
+        2. Topo-sort the DAG
+        3. Propagate reachable set sizes through DAG edges (downstream/upstream)
+        4. Map back to original nodes
+
+        Returns (downstream_counts, downstream_communities, upstream_counts).
+        """
+        if G.number_of_nodes() == 0:
+            return {}, {}, {}
+
+        # Condensation: O(V+E)
+        C = nx.condensation(G)  # DAG where each node is an SCC
+        scc_members = nx.get_node_attributes(C, "members")  # scc_id -> set of nodes
+
+        # Topo-sort condensation DAG: O(V_c + E_c)
+        topo_order = list(nx.topological_sort(C))
+
+        # Forward pass: compute downstream reachable count per SCC node
+        # downstream[scc] = total nodes reachable from this SCC (including self)
+        downstream_scc: dict[int, int] = {}
+        downstream_comm_scc: dict[int, set[int]] = {}
+
+        for scc_id in reversed(topo_order):
+            members = scc_members[scc_id]
+            count = len(members)
+            comms = {comm_map.get(m, -1) for m in members} - {-1}
+            for succ in C.successors(scc_id):
+                count += downstream_scc.get(succ, len(scc_members[succ]))
+                comms |= downstream_comm_scc.get(succ, set())
+            downstream_scc[scc_id] = count
+            downstream_comm_scc[scc_id] = comms
+
+        # Backward pass: compute upstream reachable count per SCC node
+        upstream_scc: dict[int, int] = {}
+        for scc_id in topo_order:
+            members = scc_members[scc_id]
+            count = len(members)
+            for pred in C.predecessors(scc_id):
+                count += upstream_scc.get(pred, len(scc_members[pred]))
+            upstream_scc[scc_id] = count
+
+        # Map original node -> SCC id
+        node_to_scc: dict[str, int] = {}
+        for scc_id, members in scc_members.items():
+            for m in members:
+                node_to_scc[m] = scc_id
+
+        # Map back to original nodes
+        downstream_counts: dict[str, int] = {}
+        downstream_comms: dict[str, list[int]] = {}
+        upstream_counts: dict[str, int] = {}
+
+        for node in G.nodes():
+            scc_id = node_to_scc[node]
+            # Subtract self from counts
+            downstream_counts[node] = downstream_scc[scc_id] - 1
+            downstream_comms[node] = sorted(downstream_comm_scc.get(scc_id, set()))
+            upstream_counts[node] = upstream_scc[scc_id] - 1
+
+        return downstream_counts, downstream_comms, upstream_counts
 
     def _classify_role(self, op: OperationalNode) -> str:
         """Classify a node's operational role based on its metrics."""
@@ -597,6 +663,17 @@ class NetworkEngine:
         if not target_set:
             return plan
 
+        # Precompute reachability for entry point selection.
+        # Instead of calling nx.descendants per node O(V*(V+E)),
+        # do one BFS from each target node on reversed graph O(|target|*(V+E))
+        # to find all nodes that can reach the target set.
+        reach_to_target: dict[str, int] = defaultdict(int)
+        G_rev = self.G.reverse(copy=False)
+        for t in target_set:
+            if t in G_rev:
+                for ancestor in nx.descendants(G_rev, t):  # ancestors in original
+                    reach_to_target[ancestor] += 1
+
         # -- Entry points --
         if entry_nodes:
             for en in entry_nodes:
@@ -606,25 +683,16 @@ class NetworkEngine:
                         "node": en,
                         "role": op.role,
                         "influence_score": op.influence_score,
-                        "downstream_into_target": len(
-                            set(nx.descendants(self.G, en)) & target_set
-                        )
-                        if en in self.G
-                        else 0,
+                        "downstream_into_target": reach_to_target.get(en, 0),
                     })
         else:
             # Auto-select: nodes with highest reach into target
             scored = []
-            for node, op in intel.nodes.items():
+            for node, overlap in reach_to_target.items():
                 if node in target_set:
                     continue
-                try:
-                    desc = set(nx.descendants(self.G, node))
-                except Exception:
-                    desc = set()
-                overlap = len(desc & target_set)
-                if overlap > 0:
-                    scored.append((node, overlap, op))
+                if node in intel.nodes:
+                    scored.append((node, overlap, intel.nodes[node]))
             scored.sort(key=lambda x: x[1], reverse=True)
             for node, overlap, op in scored[:5]:
                 plan.entry_points.append({
@@ -657,23 +725,23 @@ class NetworkEngine:
                     plan.paths.extend(paths)
 
         # -- Amplification chain --
-        # Identify amplifier nodes reachable from entry points that feed into target
+        # Precompute: which nodes are reachable from entry points (one BFS per entry)
+        reachable_from_entry: set[str] = set()
+        for ep in plan.entry_points[:3]:
+            if ep["node"] in self.G:
+                reachable_from_entry.update(nx.descendants(self.G, ep["node"]))
+
         amp_candidates = []
         entry_set = {ep["node"] for ep in plan.entry_points}
         for node, op in intel.nodes.items():
             if node in entry_set or node in target_set:
                 continue
             if op.role in ("amplifier", "hub"):
-                # Check if reachable from any entry AND reaches target
                 reaches_target = bool(
                     set(self.G.successors(node)) & target_set
                 )
-                reachable_from_entry = any(
-                    self.G.has_edge(ep["node"], node) or node in nx.descendants(self.G, ep["node"])
-                    for ep in plan.entry_points[:3]
-                    if ep["node"] in self.G
-                )
-                if reaches_target or reachable_from_entry:
+                from_entry = node in reachable_from_entry
+                if reaches_target or from_entry:
                     amp_candidates.append({
                         "node": node,
                         "role": op.role,
@@ -699,13 +767,10 @@ class NetworkEngine:
             key=lambda x: x["fragmentation_if_removed"], reverse=True
         )
 
-        # -- Estimated reach --
-        reachable = set()
-        for ep in plan.entry_points:
-            if ep["node"] in self.G:
-                reachable.update(nx.descendants(self.G, ep["node"]))
+        # -- Estimated reach (reuse precomputed reachable_from_entry) --
         plan.estimated_reach_pct = (
-            len(reachable & target_set) / len(target_set) if target_set else 0
+            len(reachable_from_entry & target_set) / len(target_set)
+            if target_set else 0
         )
 
         # -- Risk nodes --
