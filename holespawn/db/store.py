@@ -161,11 +161,11 @@ def store_network_report(
     source: str = "file",
 ) -> None:
     """Insert a network analysis report and optional brief into network_reports."""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     db_path = _db_path(db_path)
     output_dir = str(Path(output_dir).resolve())
-    created_at = datetime.utcnow().isoformat() + "Z"
+    created_at = datetime.now(timezone.utc).isoformat()
 
     import sqlite3
 

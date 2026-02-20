@@ -7,7 +7,7 @@ import asyncio
 import json
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from holespawn.ingest.apify_twitter import fetch_twitter_apify_raw
@@ -54,7 +54,7 @@ def _record_twitter(handle: str, recordings_root: Path, db_path: Path, max_tweet
     if raw is None:
         return False
     subject_id = handle if handle.startswith("@") else f"@{handle}"
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     subdir = recordings_root / "twitter" / subject_id
     _ensure_dir(subdir)
     file_path = subdir / f"{timestamp}.json"
@@ -161,7 +161,7 @@ def _record_discord(server: str, recordings_root: Path, db_path: Path, max_messa
         return False
 
     server_id = str(snapshot.get("server_id") or server)
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     subdir = recordings_root / "discord" / server_id
     _ensure_dir(subdir)
     file_path = subdir / f"{timestamp}.json"

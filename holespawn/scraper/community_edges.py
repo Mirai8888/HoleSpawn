@@ -300,4 +300,4 @@ if __name__ == "__main__":
     ))
 
     total = sum(len(v) for v in result.values())
-    print(f"\nEdge map: {len(result)} accounts, {total} internal edges")
+    logger.info("Edge map: %d accounts, %d internal edges", len(result), total)
