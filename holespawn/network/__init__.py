@@ -25,6 +25,16 @@ from .vulnerability import VulnerabilityReport, analyze_vulnerability
 # v4 operational engine
 from .engine import NetworkEngine, NetworkIntel, OperationalNode, OperationPlan, InfluencePath
 
+# v5 sensemaking collapse detection
+from .sensemaking import (
+    SensemakingReport,
+    CollapseSignal,
+    WindowMetrics,
+    compute_window_metrics,
+    compute_coherence_score,
+    detect_collapse,
+)
+
 __all__ = [
     "NetworkAnalyzer",
     "load_profiles_from_dir",
@@ -58,4 +68,11 @@ __all__ = [
     "OperationalNode",
     "OperationPlan",
     "InfluencePath",
+    # v5 sensemaking collapse detection
+    "SensemakingReport",
+    "CollapseSignal",
+    "WindowMetrics",
+    "compute_window_metrics",
+    "compute_coherence_score",
+    "detect_collapse",
 ]
