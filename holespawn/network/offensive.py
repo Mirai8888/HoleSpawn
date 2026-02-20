@@ -249,10 +249,11 @@ def narrative_injection_planner(
         score = (bridge_reach * 0.3) + (trust_capital * 100 * 0.4) + (alignment * 0.3)
 
         # Compute propagation paths (BFS-like, up to 3 hops into target)
+        # Use unweighted BFS which is O(V+E) and faster than Dijkstra
         prop_paths = []
         for target_node in list(target_members)[:5]:  # sample target nodes
             try:
-                path = nx.shortest_path(graph, node, target_node)
+                path = nx.shortest_path(graph, node, target_node, weight=None)
                 if len(path) <= 4:
                     prop_paths.append(path)
             except nx.NetworkXNoPath:
