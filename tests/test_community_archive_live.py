@@ -3,6 +3,9 @@
 Live test of Community Archive adapter against Supabase API.
 Fetches real data, builds graph, runs influence_flow + vulnerability.
 
+Skipped in CI/automated runs (requires network). Run manually:
+  python3 -m pytest tests/test_community_archive_live.py -v
+
 2026-02-19 - test-fire run
 """
 
@@ -11,6 +14,11 @@ import logging
 import sys
 import time
 from pathlib import Path
+
+# Skip when collected by pytest (this is a manual live test script)
+if "pytest" in sys.modules:
+    import pytest
+    pytest.skip("Live network test, run manually", allow_module_level=True)
 
 sys.path.insert(0, str(Path.home() / "HoleSpawn"))
 
